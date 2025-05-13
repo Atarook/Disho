@@ -16,7 +16,7 @@ import com.rabbitmq.client.Channel;
 import jakarta.*;
 
 @Stateful
-public class Service {
+public class Service_Order {
     private final static String QUEUE_NAME = "hello";
     @PersistenceContext(unitName = "demo")
     public EntityManager ent;
@@ -24,8 +24,8 @@ public class Service {
     public Order order;
     private List<OrderItem> cartItems = new ArrayList<>();
 
-    public Service(EntityManager ent) {
-        this.ent = ent;
+    public Service_Order() {
+
     }
 
     // Define factory as a field
