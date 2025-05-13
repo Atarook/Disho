@@ -21,7 +21,6 @@ def register():
         existing_user=Account.query.filter_by(username=username).first()
         if existing_user:
             return jsonify({"error":"User_Name already exists"}),400
-        
         Customer=Account(username=username,password=password,balance=balance,role="Customer")
         db.session.add(Customer)
         db.session.commit()

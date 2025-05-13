@@ -4,7 +4,7 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
-import com.example.demo.Repo.dish_Repo;
+import com.example.demo.repo.dish_Repo;
 import com.example.demo.model.Dish;
 
 @Service
@@ -14,7 +14,6 @@ public class dish_services {
     public dish_services(dish_Repo dishRepo) {
         this.dishRepo = dishRepo;
     }
-  
 
     public void AddDish(Dish dish) {
         dishRepo.save(dish);
@@ -24,12 +23,7 @@ public class dish_services {
         dishRepo.save(dish);
     }
 
-    public List<Dish> listAllSaleDishs(){
+    public List<Dish> listAllSaleDishs() {
         return dishRepo.getsalesdishes();
     }
-
-    
-
-
-
 }
