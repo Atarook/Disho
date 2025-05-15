@@ -31,6 +31,8 @@ private Integer amount;
 @Column(name = "sale", nullable = false)
 private boolean sale = false;
 
+@Column (name = "company_id", nullable = false)
+private int company_id;
 
 }
 
