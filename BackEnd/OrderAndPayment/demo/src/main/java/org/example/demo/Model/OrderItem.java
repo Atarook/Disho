@@ -67,4 +67,8 @@ public class OrderItem {
     public void setOrder(Order order) {
         this.order = order;
     }
+
+    @Column(name = "company_id", nullable = false)
+    public Long Company_id;
+
 }

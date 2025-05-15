@@ -34,7 +34,7 @@ public class service_msg {
     private String replyQueueName;
     private static final ObjectMapper mapper = new ObjectMapper();
 
-@PostConstruct
+    @PostConstruct
     public void init() throws IOException, TimeoutException {
         ConnectionFactory factory = new ConnectionFactory();
         factory.setHost("localhost");
@@ -51,24 +51,25 @@ public class service_msg {
         channel.queueBind(DISH_QUEUE, EXCHANGE, "dish");
 
         // Create a private reply-to queue for this service
-//        replyQueueName = channel.queueDeclare().getQueue();
+        // replyQueueName = channel.queueDeclare().getQueue();
         replyQueueName = channel.queueDeclare(
-                "",     // ask the server for a name
-                false,  // not durable
-                true,   // exclusive to this connection
-                false,  // <--- autoDelete = false
-                null
-        ).getQueue();
+                "", // ask the server for a name
+                false, // not durable
+                true, // exclusive to this connection
+                false, // <--- autoDelete = false
+                null).getQueue();
     }
 
-    public  service_msg() throws IOException, TimeoutException {
+    public service_msg() throws IOException, TimeoutException {
         init();
     }
 
     @PreDestroy
     public void teardown() throws IOException, TimeoutException {
-        if (channel != null && channel.isOpen()) channel.close();
-        if (connection != null && connection.isOpen()) connection.close();
+        if (channel != null && channel.isOpen())
+            channel.close();
+        if (connection != null && connection.isOpen())
+            connection.close();
     }
 
     public boolean checkCustomerBalance(long customerId, float cost)
@@ -86,20 +87,20 @@ public class service_msg {
         byte[] body = mapper.writeValueAsBytes(payload);
 
         // 2) Prepare a temporary reply queue
-        //    (created once in @PostConstruct as 'replyQueueName')
+        // (created once in @PostConstruct as 'replyQueueName')
         BlockingQueue<String> responseQueue = new ArrayBlockingQueue<>(1);
 
         String consumerTag = channel.basicConsume(
-                replyQueueName,         // the auto‑delete, exclusive reply queue
-                true,                   // autoAck
+                replyQueueName, // the auto‑delete, exclusive reply queue
+                true, // autoAck
                 (ct, delivery) -> {
                     AMQP.BasicProperties props = delivery.getProperties();
                     if (corrId.equals(props.getCorrelationId())) {
                         responseQueue.offer(new String(delivery.getBody(), StandardCharsets.UTF_8));
                     }
                 },
-                ct -> {}
-        );
+                ct -> {
+                });
 
         // 3) Publish the request
         AMQP.BasicProperties props = new AMQP.BasicProperties.Builder()
@@ -109,11 +110,10 @@ public class service_msg {
                 .build();
 
         channel.basicPublish(
-                EXCHANGE,      // "order_exchange"
-                "customer",    // routing key
+                EXCHANGE, // "order_exchange"
+                "customer", // routing key
                 props,
-                body
-        );
+                body);
 
         // 4) Block until we get a reply
         String reply = responseQueue.poll(20, TimeUnit.SECONDS);
@@ -125,8 +125,7 @@ public class service_msg {
         return ok;
     }
 
-
-    public boolean checkDishStock(List<OrderItem> cartItems ) throws IOException, InterruptedException {
+    public boolean checkDishStock(List<OrderItem> cartItems) throws IOException, InterruptedException {
         String corrId = UUID.randomUUID().toString();
         // Build JSON payload with order items and timestamp
         ObjectNode payload = mapper.createObjectNode();
@@ -140,7 +139,8 @@ public class service_msg {
             if (delivery.getProperties().getCorrelationId().equals(corrId)) {
                 responseQueue.offer(new String(delivery.getBody(), UTF_8));
             }
-        }, consumerTag -> {});
+        }, consumerTag -> {
+        });
 
         AMQP.BasicProperties props = new AMQP.BasicProperties.Builder()
                 .correlationId(corrId)
@@ -155,18 +155,20 @@ public class service_msg {
             System.out.println("↪ [DEBUG] Stock-check timed out after 1 minute");
             return true;
         }
-//        channel.basicCancel(ctag);
+        // channel.basicCancel(ctag);
         boolean ok = Boolean.parseBoolean(response.trim());
         System.out.println(" DISHSHSH↪ [DEBUG] parsed OK = " + ok);
         return ok;
-//        return "YES".equalsIgnoreCase(response);
-//        return Boolean.parseBoolean(response);
+        // return "YES".equalsIgnoreCase(response);
+        // return Boolean.parseBoolean(response);
     }
+
     Service_Order so = new Service_Order();
+
     public void processOrder(long customerId, List<OrderItem> cartItems) {
         try {
             init();
-//            so.convert("dish1",12.0,2,2);
+            // so.convert("dish1",12.0,2,2);
             // Persist basic order info
             Order order = new Order();
             order.setOrderItems(cartItems);
@@ -177,7 +179,7 @@ public class service_msg {
             }
             order.setCost(cost);
             order.setOrderStatus("Pending");
-//            ent.persist(order);
+            // ent.persist(order);
 
             // Step 1: Verify customer balance
             if (!checkCustomerBalance(customerId, cost)) {
@@ -186,11 +188,10 @@ public class service_msg {
             }
             System.out.println("hees ya3m: " + customerId);
 
-
             // Step 2: Verify dish stock
             if (checkDishStock(cartItems)) {//
 
-//                System.out.println(checkDishStock());
+                // System.out.println(checkDishStock());
                 ObjectNode commitCust = mapper.createObjectNode();
                 commitCust.put("customerId", customerId);
                 commitCust.put("cost", cost);
@@ -199,31 +200,30 @@ public class service_msg {
                 channel.basicPublish(EXCHANGE, "customer", null, mapper.writeValueAsBytes(commitCust));
                 System.out.println("InsuffX icient stock for order items");
                 return;
-            }
-            else{
+            } else {
                 System.out.println("mafrood hena ");
 
             }
 
-
             // Step 3: Deduct cost and stock (commit)
-//            ObjectNode commitCust = mapper.createObjectNode();
-//            commitCust.put("customerId", customerId);
-//            commitCust.put("deductCost", "false");
-//            commitCust.put("timestamp", Instant.now().toString());
-//            channel.basicPublish(EXCHANGE, "customer", null, mapper.writeValueAsBytes(commitCust));
+            // ObjectNode commitCust = mapper.createObjectNode();
+            // commitCust.put("customerId", customerId);
+            // commitCust.put("deductCost", "false");
+            // commitCust.put("timestamp", Instant.now().toString());
+            // channel.basicPublish(EXCHANGE, "customer", null,
+            // mapper.writeValueAsBytes(commitCust));
 
-//            ObjectNode commitDish = mapper.createObjectNode();
-//            commitDish.putPOJO("items", cartItems);
-//            commitDish.put("deductStock", true);
-//            commitDish.put("timestamp", Instant.now().toString());
-//            channel.basicPublish(EXCHANGE, "dish", null, mapper.writeValueAsBytes(commitDish));
+            // ObjectNode commitDish = mapper.createObjectNode();
+            // commitDish.putPOJO("items", cartItems);
+            // commitDish.put("deductStock", true);
+            // commitDish.put("timestamp", Instant.now().toString());
+            // channel.basicPublish(EXCHANGE, "dish", null,
+            // mapper.writeValueAsBytes(commitDish));
 
             System.out.println("Order processed and committed for customer " + customerId);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
-
 
 }

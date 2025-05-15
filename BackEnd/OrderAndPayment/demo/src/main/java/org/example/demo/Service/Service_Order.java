@@ -1,6 +1,5 @@
 package org.example.demo.Service;
 
-
 import com.rabbitmq.client.*;
 import jakarta.ejb.Startup;
 import jakarta.ejb.Stateful;
@@ -85,6 +84,7 @@ import java.util.concurrent.atomic.AtomicReference;
 //
 
 //
+
 //    public void createOrder(long customerid) {
 //        Order order = new Order();
 //        order.setOrderItems(cartItems);
@@ -115,10 +115,7 @@ import java.util.concurrent.atomic.AtomicReference;
 //    }
 //
 
-
-
 import com.rabbitmq.client.*;
-
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -147,51 +144,63 @@ public class Service_Order {
     @PersistenceContext(unitName = "demo")
     public EntityManager ent;
     private List<OrderItem> cartItems = new ArrayList<>();
+
     public Service_Order() throws IOException, TimeoutException {
     }
+
     public void convert(String name, Double price, int id, int quan) {
         OrderItem orderItem = new OrderItem();
         orderItem.setDishId(id);
         orderItem.setDishName(name);
         orderItem.setDishPrice(price);
         orderItem.setQuantity(quan);
-//        ent.persist(orderItem);
+        // ent.persist(orderItem);
         cartItems.add(orderItem);
     }
-    public List<Order> GetOrders(){
+
+    public List<Order> GetOrders() {
         return ent.createQuery("SELECT o FROM Order o", Order.class)
                 .getResultList();
     }
 
-//    public boolean checkCustomerBalance(long customerId, long cost) throws IOException, InterruptedException {
-//        String corrId = UUID.randomUUID().toString();
-//        // Build JSON payload with timestamp
-//        ObjectNode payload = mapper.createObjectNode();
-//        payload.put("customerId", customerId);
-//        payload.put("cost", cost);
-//        payload.put("timestamp", Instant.now().toString());
-//        byte[] body = mapper.writeValueAsBytes(payload);
-//
-//        BlockingQueue<String> responseQueue = new ArrayBlockingQueue<>(1);
-//        String ctag = channel.basicConsume(replyQueueName, true, (consumerTag, delivery) -> {
-//            if (delivery.getProperties().getCorrelationId().equals(corrId)) {
-//                responseQueue.offer(new String(delivery.getBody(), StandardCharsets.UTF_8));
-//            }
-//        }, consumerTag -> {});
-//
-//        AMQP.BasicProperties props = new AMQP.BasicProperties.Builder()
-//                .correlationId(corrId)
-//                .replyTo(replyQueueName)
-//                .contentType("application/json")
-//                .build();
-//
-//        channel.basicPublish(EXCHANGE, "customer", props, body);
-//        String response = responseQueue.take();
-//        System.out.println("↪ [DEBUG] raw stock‐check reply = `" + response + "`");
-//
-//        channel.basicCancel(ctag);
-//        boolean ok = Boolean.parseBoolean(response.trim());
-//        System.out.println("↪ [DEBUG] parsed OK = " + ok);
-//        return ok;
-//    }
+    public List<OrderItem> getSoldItems(Long Company_id) {
+
+        return ent.createQuery("SELECT o FROM OrderItem o where company_id=?1", OrderItem.class)
+                .setParameter(1, Company_id)
+                .getResultList();
+    }
+
+    // public boolean checkCustomerBalance(long customerId, long cost) throws
+    // IOException, InterruptedException {
+    // String corrId = UUID.randomUUID().toString();
+    // // Build JSON payload with timestamp
+    // ObjectNode payload = mapper.createObjectNode();
+    // payload.put("customerId", customerId);
+    // payload.put("cost", cost);
+    // payload.put("timestamp", Instant.now().toString());
+    // byte[] body = mapper.writeValueAsBytes(payload);
+    //
+    // BlockingQueue<String> responseQueue = new ArrayBlockingQueue<>(1);
+    // String ctag = channel.basicConsume(replyQueueName, true, (consumerTag,
+    // delivery) -> {
+    // if (delivery.getProperties().getCorrelationId().equals(corrId)) {
+    // responseQueue.offer(new String(delivery.getBody(), StandardCharsets.UTF_8));
+    // }
+    // }, consumerTag -> {});
+    //
+    // AMQP.BasicProperties props = new AMQP.BasicProperties.Builder()
+    // .correlationId(corrId)
+    // .replyTo(replyQueueName)
+    // .contentType("application/json")
+    // .build();
+    //
+    // channel.basicPublish(EXCHANGE, "customer", props, body);
+    // String response = responseQueue.take();
+    // System.out.println("↪ [DEBUG] raw stock‐check reply = `" + response + "`");
+    //
+    // channel.basicCancel(ctag);
+    // boolean ok = Boolean.parseBoolean(response.trim());
+    // System.out.println("↪ [DEBUG] parsed OK = " + ok);
+    // return ok;
+    // }
 }

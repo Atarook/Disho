@@ -14,58 +14,71 @@ import java.util.concurrent.TimeoutException;
 @Path("hell")
 @Produces(MediaType.TEXT_PLAIN)
 public class HelloResource {
-//    @GET
-//    @Produces("text/plain")
-//    public String hello() {
-//        return "Hello, World!";
-//    }
+    // @GET
+    // @Produces("text/plain")
+    // public String hello() {
+    // return "Hello, World!";
+    // }
 
     service_msg s = new service_msg();
 
     public HelloResource() throws IOException, TimeoutException {
     }
+
     @POST
     @Path("msg")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.TEXT_PLAIN)
-    public Response  test(Long customerId,List<OrderItem> cartitems) {
-        try{
-        System.out.println("hello");
-        s.processOrder(customerId,cartitems);
-        return Response.ok("OK").build();}
-        catch(Exception e){
+    public Response test(Long customerId, List<OrderItem> cartitems) {
+        try {
+            System.out.println("hello");
+            s.processOrder(customerId, cartitems);
+            return Response.ok("OK").build();
+        } catch (Exception e) {
             e.printStackTrace();
             return Response.serverError().entity(e.getMessage()).build();
         }
     }
+
     @GET
     @Path("GetOrders")
     @Produces(MediaType.TEXT_PLAIN)
     public Response getOrders() {
-        try{
+        try {
             List<Order> orders;
-            orders= (List<Order>) getOrders();
+            orders = (List<Order>) getOrders();
             return Response.ok(orders).build();
-        }
-        catch(Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
             return Response.serverError().entity(e.getMessage()).build();
         }
     }
 
-
-    //sm3ny ??
+    @POST
+    @Path("GetSoldOrders")
+    @Produces(MediaType.TEXT_PLAIN)
+    public Response getSoldOrders(Long customerId) {
+        try {
+            List<OrderItem> sold_items;
+            sold_items = (List<OrderItem>) getSoldOrders(customerId);
+            return Response.ok(sold_items).build();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Response.serverError().entity(e.getMessage()).build();
+        }
+    }
+    // sm3ny ??
     // 2ool hena
 
-//    @GET
-//    @Path("re")
-//    @Produces(MediaType.TEXT_PLAIN)
-//    public String test2() {
-//        return s.receive();
-//    }
-//    @POST
-//    @Path("order")
-//    public createorder(long ){
-//
-//    }
+    // @GET
+    // @Path("re")
+    // @Produces(MediaType.TEXT_PLAIN)
+    // public String test2() {
+    // return s.receive();
+    // }
+    // @POST
+    // @Path("order")
+    // public createorder(long ){
+    //
+    // }
 }
