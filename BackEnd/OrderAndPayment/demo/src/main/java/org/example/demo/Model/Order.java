@@ -1,7 +1,6 @@
-package com.example.MicroService.Models;
+package org.example.demo.Model;
 
 import jakarta.persistence.*;
-
 import java.util.List;
 
 @Entity

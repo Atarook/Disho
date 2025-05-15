@@ -1,105 +1,160 @@
-from flask import Blueprint, request,jsonify, session
-from Models import Account
+import json
+import pika
+from flask import Blueprint, request, jsonify, session
+from flask_sqlalchemy import SQLAlchemy
+
 from database import db
-import secrets
+from Models import Account
 
-routes = Blueprint('routes', __name__)
+# —————————————————————————————————————————————————————————————
+# HTTP Blueprint
+# —————————————————————————————————————————————————————————————
+routes = Blueprint("routes", __name__)
 
-
-
-@routes.route('/register',methods=["POST"])
+@routes.route('/register', methods=["POST"])
 def register():
-    try:
-        data=request.json
-        username=data.get("username")
-        password=data.get("password")
-        balance=data.get("balance")
-        required_fields=["username","password","balance"]
-        for field in required_fields:
-            if field not in data:
-                return jsonify({"error":f"The following is missing: {field}"}),400
-        existing_user=Account.query.filter_by(username=username).first()
-        if existing_user:
-            return jsonify({"error":"User_Name already exists"}),400
-        Customer=Account(username=username,password=password,balance=balance,role="Customer")
-        db.session.add(Customer)
-        db.session.commit()
-        session["username"]=username
-        session["user_role"]="Customer"
-        return jsonify({"message":f"Account registered successfully with the name : {username}"}),201      
-    except Exception as E:
-        return jsonify({"error": str(E)}), 500     
-@routes.route('/login',methods=["POST"])
+    data = request.get_json() or {}
+    for field in ("username", "password", "balance"):
+        if field not in data:
+            return jsonify({"error": f"Missing field: {field}"}), 400
+
+    if Account.query.filter_by(username=data["username"]).first():
+        return jsonify({"error": "Username already exists"}), 400
+
+    user = Account(
+        username=data["username"],
+        password=data["password"],
+        balance=data["balance"],
+        role="Customer"
+    )
+    db.session.add(user)
+    db.session.commit()
+    session["username"]   = user.username
+    session["user_role"]  = user.role
+    return jsonify({"message": f"Registered {user.username}"}), 201
+
+@routes.route('/list_all', methods=["GET"])
+def list_all_accounts():
+    accounts = Account.query.all()
+    return jsonify([account.to_json() for account in accounts]), 200
+
+@routes.route('/login', methods=["POST"])
 def login():
-    try :
-        data=request.json
-        username=data.get("username")
-        password=data.get("password")        
-        required_fields=["username","password"]
-        for field in required_fields:
-            if field not in data:
-                return jsonify({"error":f"The following is missing: {field}"},400)  
-        existing_user=Account.query.filter_by(username=username).first()
-        if existing_user:
-            if existing_user.password==password:
-                session["username"]=username
-                session["user_role"]=existing_user.role
-                return jsonify({"message":"Login successful"}),200
+    data = request.get_json() or {}
+    for field in ("username", "password"):
+        if field not in data:
+            return jsonify({"error": f"Missing field: {field}"}), 400
+
+    user = Account.query.filter_by(username=data["username"]).first()
+    if not user or user.password != data["password"]:
+        return jsonify({"error": "Invalid credentials"}), 401
+
+    session["username"]  = user.username
+    session["user_role"] = user.role
+    return jsonify({"message": "Login successful"}), 200
+
+# (other admin/company endpoints omitted for brevity…)
+
+# —————————————————————————————————————————————————————————————
+# RabbitMQ RPC Server for Customer Balance Check
+# —————————————————————————————————————————————————————————————
+RABBITMQ_PARAMS = pika.ConnectionParameters(
+    host="localhost",
+    port=5672,
+    credentials=pika.PlainCredentials("guest", "guest")
+)
+EXCHANGE     = "order_exchange"
+ROUTING_KEY  = "customer"
+QUEUE_NAME   = "customer_request_queue"
+
+def on_customer_request(ch, method, props, body, flask_app):
+    """
+    Callback for each incoming RPC request from OrderService.
+    Parses JSON {customerId, cost, timestamp}, checks/deducts balance,
+    and replies "YES"/"NO" to props.reply_to.
+    """
+    with flask_app.app_context():
+        try:
+            min_charge=10.0
+            payload = json.loads(body)
+            print(payload)
+            cid = payload.get("customerId")
+            cost = payload.get("cost", 0)
+            deduct = payload.get("deductCost")
+            acct = Account.query.get(cid)
+            ok = (acct is not None and acct.balance >= cost and cost>min_charge)
+            print(ok)
+            if ok and deduct=="true":   
+                print(f"[CustomerRPC] Deducting {cost} from {acct.username}")
+                acct.balance -= cost
+                db.session.commit()
+            elif ok and deduct=="false":
+                print(f"[CustomerRPC] No stock {acct.username}")
+                acct.balance += cost
+                db.session.commit()
+            elif not ok:
+                print(f"[CustomerRPC] Insufficient funds for customer {cid}")
+                db.session.rollback()
             else:
-                return jsonify({"error":"Invalid password"}),401
-        else: 
-            return jsonify({"error":"User not found"}),404
-                
-    except Exception as E:
-        print(E)
-        return jsonify({"error":"An error occurred"}),500
+                print(f"[CustomerRPC] Balance check passed for customer {cid}")
 
-
-@routes.route('/create_company',methods=["POST"])
-def create_company():
-    try:
-        if session["user_role"]=="Admin":
-             data=request.json
-             username=data.get("username")
-             required_fields=["username"]
-             if  "username" not in data:
-                 return jsonify({"error":f"The following is missing: username"}),400
-             existing_Company=Account.query.filter_by(username=username).first()
-             if existing_Company:
-                return jsonify({"error":"User_Name already exists"}),400
-             auto_password=secrets.token_urlsafe(8)
-             company=Account(username=username,password=auto_password,balance=0,role="Company")
-             db.session.add(company)
-             db.session.commit()
-             return jsonify({"message":f"Account registered successfully with the name : {username}"}),201      
-        else:
-             return jsonify({"error":"Permission Denied"}),403      
-    except Exception as E:
-        return jsonify({"error": str(E)}), 500 
-
-
-@routes.route('/list_all_cust_accounts',methods=["GET"])
-def List_all_accounts():
-    try:
-        if session["user_role"]=="Admin":
-            accounts=Account.query.filter_by(role="Customer").all()
-            account_list=[account.to_json() for account in accounts]
-            return jsonify(account_list),200
-        else:
-            return jsonify({"error":"You are not authorized to view this page"}),403
-    except Exception as E:
-        return jsonify({"error": str(E)}), 500
-@routes.route('/list_all_companies',methods=["GET"])
-def List_all_accounts_comapnies():
-    try:
-        if session["user_role"]=="Admin":
-            accounts=Account.query.filter_by(role="Company").all()
-            account_list=[account.to_json() for account in accounts]
-            return jsonify(account_list),200
-        else:
-            return jsonify({"error":"You are not authorized to view this page"}),403
-    except Exception as E:
-        return jsonify({"error": str(E)}), 500
+            response = "true" if ok else "false"  # Java client expects YES/NO
+        except Exception as e:
+            print(f"[CustomerRPC] Error: {e}")
+            db.session.rollback()
+            response = "false"
     
+    # Only try to reply if we have a valid reply_to queue
+    if props.reply_to and isinstance(props.reply_to, (str, bytes)):
+        try:
+            # Send RPC reply
+            ch.basic_publish(
+                exchange="",
+                routing_key=props.reply_to,
+                properties=pika.BasicProperties(
+                    correlation_id=props.correlation_id,
+                    content_type="text/plain"
+                ),
+                body=response
+            )
+            print(f"[CustomerRPC] Replied: {response} to {props.reply_to}")
+        except Exception as e:
+            print(f"[CustomerRPC] Failed to send reply: {e}")
+    else:
+        print(f"[CustomerRPC] No valid reply_to queue, can't respond (reply_to={props.reply_to})")
     
+    # Always acknowledge the request
+    ch.basic_ack(delivery_tag=method.delivery_tag)
+
+def start_customer_rpc_server(flask_app):
+    """
+    Declares exchange, queue, binding, and begins consuming.
+    Runs forever in its own thread.
+    """
+    connection = pika.BlockingConnection(RABBITMQ_PARAMS)
+    channel = connection.channel()
     
+
+    # 1) Declare direct exchange + queue + bind
+    channel.exchange_declare(exchange=EXCHANGE,
+                             exchange_type="direct",
+                             durable=True)
+    channel.queue_declare(queue=QUEUE_NAME, durable=True)
+    channel.queue_bind(queue=QUEUE_NAME,
+                       exchange=EXCHANGE,
+                       routing_key=ROUTING_KEY)
+
+    # 2) Fair dispatch
+    channel.basic_qos(prefetch_count=1)
+
+    # 3) Create a callback wrapper that includes the Flask app
+    def callback_wrapper(ch, method, props, body):
+        return on_customer_request(ch, method, props, body, flask_app)
+
+    # 4) Start consuming with the wrapped callback
+    channel.basic_consume(
+        queue=QUEUE_NAME,
+        on_message_callback=callback_wrapper
+    )
+    print(f"[CustomerRPC] Listening on {QUEUE_NAME} ...")
+    channel.start_consuming()

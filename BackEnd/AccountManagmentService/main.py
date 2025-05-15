@@ -1,28 +1,55 @@
+import os
+import threading
+
 from flask import Flask
-import os 
-from flask_cors import CORS # Importing CORS for Cross-Origin Resource Sharing
-import sqlite3
-from database import db
+from flask_cors import CORS
 from dotenv import load_dotenv
-load_dotenv()
 
-
-
-app=Flask(__name__)
-CORS(app)
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"]=False
-app.config["SECRET_KEY"]=os.environ.get("SECRET_KEY")
-db.init_app(app)
-from routes import routes
-app.register_blueprint(routes)
+from database import db
 from Models import Account
+import routes  # our Blueprint + RPC server code
+
+# —————————————————————————————————————————————————————————————
+# Load environment
+# —————————————————————————————————————————————————————————————
+load_dotenv()
+DATABASE_URL = os.environ.get("DATABASE_URL")
+SECRET_KEY   = os.environ.get("SECRET_KEY")
+
+# —————————————————————————————————————————————————————————————
+# Flask setup
+# —————————————————————————————————————————————————————————————
+app = Flask(__name__)
+CORS(app)
+
+app.config["SQLALCHEMY_DATABASE_URI"]        = DATABASE_URL
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SECRET_KEY"]                     = SECRET_KEY
+
+# Initialize SQLAlchemy
+db.init_app(app)
+
+# Register your routes (HTTP + RPC)
+app.register_blueprint(routes.routes)
+
+# Create tables & default admin
 with app.app_context():
     db.create_all()
-    admin_exists = Account.query.filter_by(username='Admin').first()
-    if not admin_exists:
-        admin = Account(username='Admin', password='Admin123', role='Admin', balance=9999999999)
-        db.session.add(admin)
-        db.session.commit()
-if __name__=="__main__":
+    # if not Account.query.filter_by(username="Admin").first():
+        # admin = Account(
+        #     username="Admin",
+        #     password="Admin123",
+        #     role="Admin",
+        #     balance=999999999
+        # )
+        # db.session.add(admin)
+        # db.session.commit()
+    
+
+if __name__ == "__main__":
+    # Pass the app to the RPC server
+    rpc_thread = threading.Thread(target=routes.start_customer_rpc_server, args=(app,), daemon=True)
+    rpc_thread.start()
+    
+    # Start Flask web server
     app.run(debug=True)
