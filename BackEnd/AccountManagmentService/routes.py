@@ -56,6 +56,31 @@ def logout():
     session.clear()
     return jsonify({"message": "Logged out successfully"}), 200
 
+@routes.route('/get_Acc_info', methods=['GET'])
+def get_account_info():
+    id = request.args.get("id")
+    if not id:
+        return jsonify({"error": "User not found"}), 401
+    user = Account.query.filter_by(id=id).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    return jsonify({
+        "username": user.username,
+    }), 200
+ 
+@routes.route('/get_company_info', methods=['GET'])
+def get_company_info():
+    id = request.args.get("id")
+    if not id:
+        return jsonify({"error": "User not found"}), 401
+    user = Account.query.filter_by(id=id).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    return jsonify({
+        "username": user.username,
+        "location": user.location,
+    }), 200
+ 
 
 @routes.route('/me', methods=['GET'])
 def me():
@@ -75,6 +100,8 @@ def me():
     }), 200
     
     
+
+
 @routes.route('/list_all', methods=["GET"])
 def list_all_accounts():
     accounts = Account.query.all()
@@ -93,6 +120,7 @@ def list_all_customers():
     return jsonify([account.to_json() for account in accounts]), 200
 
 
+
 @routes.route('/list_all_companies', methods=["GET"])
 def list_all_companies():
     id=session.get("id")
@@ -108,7 +136,7 @@ def list_all_companies():
 @routes.route('/create_company',methods=["POST"])
 def create_company():
     data = request.get_json() or {}
-    for field in ("username","location"):
+    for field in ("username","location","role","shipping_fees"):
         if field not in data:
             return jsonify({"error": f"Missing field: {field}"}), 400
     id=session.get("id")
@@ -118,13 +146,16 @@ def create_company():
     if user.role !='Admin':
         return jsonify({"error": "Not an admin"}), 403
     Company = Account.query.filter_by(username=data["username"]).first()
+
     if Company:
         return jsonify({"error": "There is a company with the same username "}), 401
     Company = Account(
         username=data["username"],
+        
         password=secrets.token_urlsafe(8),
         location=data["location"],
-        role="Company"
+        role=data["role"],
+        shipping_fees=data["shipping_fees"]
     )
     db.session.add(Company)
     db.session.commit()
@@ -133,6 +164,16 @@ def create_company():
     "password": Company.password}), 200
     
     
+@routes.route('/getShippingFees',methods=["GET"])
+def getShippingFees():
+    id=request.args.get("id")
+    if not id:
+        return jsonify({"error": "User not found"}), 401
+    user = Account.query.filter_by(id=id).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    shipping_fees = user.shipping_fees
+    return jsonify({"shipping_fees": shipping_fees}), 200
 
 @routes.route('/get_location',methods=["GET"])
 def location():
