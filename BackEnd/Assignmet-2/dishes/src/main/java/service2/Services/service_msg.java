@@ -23,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.sql.DatabaseMetaData;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -31,11 +32,13 @@ import java.util.concurrent.TimeoutException;
 
 import javax.xml.crypto.Data;
 
+import org.springframework.web.client.RestTemplate;
+
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 @Singleton
 public class service_msg {
-
+    final int minimumCost = 200;
     private static final String CUSTOMER_QUEUE = "customer_request_queue";
     private static final String DISH_QUEUE = "rpc.check_stock";
     private static final String EXCHANGE = "order_exchange";
@@ -176,71 +179,98 @@ public class service_msg {
 
     Service_Order so = new Service_Order();
 
-    public boolean processOrder(long customerId, List<OrderItem> cartItems) {
+    public String callExternalApi(String url) {
+        RestTemplate restTemplate = new RestTemplate();
+        String response = restTemplate.getForObject(url, String.class);
+        return response;
+    }
+
+    public Map<String, Object> processOrder(long customerId, List<OrderItem> cartItems, long companyId) {
+        Map<String, Object> result = new java.util.HashMap<>();
         try {
+            DatabaseConnection Data = new DatabaseConnection();
+            OrderDAL orderDAL = new OrderDAL(Data.getConnection());
+            System.out.println("dddddddddddddddddddddddddddd");
+
             init();
-            // so.convert("dish1",12.0,2,2);
-            // Persist basic order info
+            System.out.println("customerId: " + customerId);
+            System.out.println("cartItems: " + cartItems);
+            String x = callExternalApi("http://127.0.0.1:5000/getShippingFees?id=" + companyId);
+            System.out.println("Shipping fees: " + x);
+            float shippingFees = 0.0f;
+            try {
+                Map<String, Object> shippingMap = mapper.readValue(x, Map.class);
+                shippingFees = ((Number) shippingMap.get("shipping_fees")).floatValue();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
             Order order = new Order();
             order.setOrderItems(cartItems);
             order.setCustomerId(customerId);
+            order.setCompany_id(companyId);
             long cost = 0;
-            for (int i = 0; i < order.getOrderItems().size(); i++) {
-                cost += order.getOrderItems().get(i).getDishPrice() * order.getOrderItems().get(i).getQuantity();
+            for (OrderItem item : order.getOrderItems()) {
+                cost += item.getDishPrice() * item.getQuantity();
             }
+
+            if (cost < minimumCost) {
+                result.put("status", "failed");
+                result.put("message", "The minimum charge is not met");
+                result.put("orderStatus", "Rejected");
+                return result;
+            }
+            cost += shippingFees;
             order.setCost(cost);
             order.setOrderStatus("Pending");
-            // ent.persist(order);
+            orderDAL.addOrder(order);
 
             // Step 1: Verify customer balance
             if (!checkCustomerBalance(customerId, cost)) {
                 System.out.println("Insufficient funds for customer: " + customerId);
-                return false;
+                orderDAL.deleteOrder(order.getId());
+                result.put("status", "failed");
+                result.put("message", "Insufficient funds for customer");
+                result.put("orderStatus", "Rejected");
+                return result;
             }
-            System.out.println("hees ya3m: " + customerId);
 
             // Step 2: Verify dish stock
-            if (checkDishStock(cartItems)) {//
-
-                // System.out.println(checkDishStock());
+            if (checkDishStock(cartItems)) {
                 ObjectNode commitCust = mapper.createObjectNode();
                 commitCust.put("customerId", customerId);
                 commitCust.put("cost", cost);
                 commitCust.put("deductCost", "false");
                 commitCust.put("timestamp", Instant.now().toString());
                 channel.basicPublish(EXCHANGE, "customer", null, mapper.writeValueAsBytes(commitCust));
-                System.out.println("InsuffX icient stock for order items");
-                return false;
-            } else {
-                System.out.println("mafrood hena ");
-
+                System.out.println("Insufficient stock for order items");
+                orderDAL.deleteOrder(order.getId());
+                result.put("status", "failed");
+                result.put("message", "Insufficient stock for order items");
+                result.put("orderStatus", "Rejected");
+                return result;
             }
 
             // Step 3: Deduct cost and stock (commit)
-            // ObjectNode commitCust = mapper.createObjectNode();
-            // commitCust.put("customerId", customerId);
-            // commitCust.put("deductCost", "false");
-            // commitCust.put("timestamp", Instant.now().toString());
-            // channel.basicPublish(EXCHANGE, "customer", null,
-            // mapper.writeValueAsBytes(commitCust));
-
-            // ObjectNode commitDish = mapper.createObjectNode();
-            // commitDish.putPOJO("items", cartItems);
-            // commitDish.put("deductStock", true);
-            // commitDish.put("timestamp", Instant.now().toString());
-            // channel.basicPublish(EXCHANGE, "dish", null,
-            // mapper.writeValueAsBytes(commitDish));
-            DatabaseConnection Data = new DatabaseConnection();
-            OrderDAL orderDAL = new OrderDAL(Data.getConnection());
-            orderDAL.addOrder(order);
-            
+            order.setOrderStatus("Accepted");
+            orderDAL.updateOrder(order);
             System.out.println("Order processed and committed for customer " + customerId);
-            return true;
+
+            result.put("status", "success");
+            result.put("message", "Order processed and accepted");
+            result.put("orderStatus", "Accepted");
+            result.put("orderId", order.getId());
+            result.put("cost", order.getCost());
+            return result;
         } catch (Exception e) {
+            System.out.println("Error processing order: " + e.getMessage());
 
             e.printStackTrace();
-            return false;
-            }
+            result.put("status", "error");
+            result.put("message", e.getMessage());
+            result.put("orderStatus", "Error");
+
+            return result;
+        }
     }
 
 }

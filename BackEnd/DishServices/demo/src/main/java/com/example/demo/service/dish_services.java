@@ -229,5 +229,7 @@ public void UpdateDish(Dish incoming) throws AccessDeniedException {
   public List<Dish> listAllDishes(Long companyId) {
     return dishRepo.findAllByCompany(companyId);
   }
-
+public List<Dish> listAll() {
+    return dishRepo.findAll();
+  }
 }

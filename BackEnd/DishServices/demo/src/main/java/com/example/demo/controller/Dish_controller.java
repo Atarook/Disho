@@ -57,6 +57,10 @@ public class Dish_controller {
   public List<Dish> getAllDishes(@RequestParam("companyId") Long companyId) {
     return dishes.listAllDishes(companyId);
   }
+   @GetMapping("get_alldishes")
+  public List<Dish> getAllDishes() {
+    return dishes.listAll();
+  }
     
     @GetMapping("/test")
     public String getdish() {
@@ -67,4 +71,5 @@ public class Dish_controller {
     public String testJson(@RequestBody Map<String, Object> payload) {
         return "Received JSON: " + payload;
     }
+
 }

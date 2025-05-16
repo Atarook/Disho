@@ -6,6 +6,110 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dishes Platform - Customer Dashboard</title>
   <link rel="stylesheet" href="css/styles.css" />
+  <style>
+    /* Grid layout for dish cards */
+    .dishes-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 1rem;
+      padding: 1rem;
+    }
+    .dish-card {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+      background-color: #fff;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .dish-card img {
+      width: 100%;
+      height: 150px;
+      object-fit: cover;
+      border-radius: 4px;
+    }
+    .dish-name {
+      font-size: 1.2rem;
+      margin: 0.5rem 0;
+      color: #333;
+    }
+    .dish-price {
+      color: #007bff;
+      font-weight: bold;
+      margin-bottom: 1rem;
+    }
+    .add-to-cart-btn {
+      background-color: #ff9900;
+      border: none;
+      color: #fff;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    /* Cart Counter on top-right */
+    .cart-counter {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      background: #ff9900;
+      color: #fff;
+      padding: 0.5rem 0.75rem;
+      border-radius: 50%;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    /* Cart Sidebar Styles */
+    .sidebar {
+      position: fixed;
+      top: 0;
+      right: -400px;
+      width: 400px;
+      height: 100%;
+      background-color: #fff;
+      box-shadow: -2px 0 4px rgba(0,0,0,0.1);
+      transition: right 0.3s;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+    }
+    .sidebar.active {
+      right: 0;
+    }
+    .sidebar-header {
+      padding: 1rem;
+      border-bottom: 1px solid #ddd;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .close-btn {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+    .cart-items {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+    }
+    .cart-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .cart-item img {
+      width: 60px;
+      height: 60px;
+      object-fit: cover;
+      border-radius: 4px;
+      margin-right: 1rem;
+    }
+    .cart-summary {
+      padding: 1rem;
+      border-top: 1px solid #ddd;
+    }
+  </style>
 </head>
 <body>
   <nav class="main-nav">
@@ -14,34 +118,45 @@
     </div>
     <div class="nav-right">
       <button class="btn btn-secondary" id="logoutBtn">Logout</button>
+      <button class="btn btn-primary" id="viewCartBtn">View Cart</button>
     </div>
   </nav>
 
+  <!-- Cart Counter -->
+  <div class="cart-counter" id="cartCount">0</div>
+
+  <!-- Main Content -->
   <div class="main-container">
     <div class="welcome-section">
       <h1>Customer Dashboard</h1>
       <p>Welcome to your customer dashboard</p>
     </div>
+    <!-- Dishes Grid -->
+    <div class="dishes-grid" id="dishesGrid">
+      <!-- Dish cards loaded dynamically -->
+    </div>
+  </div>
 
-    <div class="features">
-      <div class="feature-card">
-        <h3>Your Orders</h3>
-        <p>View and manage your orders</p>
-      </div>
-      <div class="feature-card">
-        <h3>Browse Dishes</h3>
-        <p>Explore available dishes from various sellers</p>
-      </div>
-      <div class="feature-card">
-        <h3>Your Profile</h3>
-        <p>Manage your account settings</p>
-      </div>
+  <!-- Cart Sidebar -->
+  <div class="sidebar" id="cartSidebar">
+    <div class="sidebar-header">
+      <h2>Your Cart</h2>
+      <button class="close-btn" id="closeCartBtn">&times;</button>
+    </div>
+    <div class="cart-items" id="cartItems">
+      <!-- Cart items rendered here -->
+    </div>
+    <div class="cart-summary">
+      <p>Subtotal: $<span id="cartSubtotal">0.00</span></p>
+      <button class="btn btn-primary" id="checkoutBtn">Checkout</button>
     </div>
   </div>
 
   <script>
     const API = 'http://localhost:5000';
+    let dishes = [];
 
+    // Logout functionality
     document.getElementById('logoutBtn').addEventListener('click', async () => {
       try {
         const resp = await fetch(`${API}/logout`, {
@@ -51,13 +166,143 @@
         if (resp.ok) {
           window.location.href = 'Login.html';
         } else {
-          alert('Logout failed. Please try again.');
+          alert('Logout failed.');
         }
       } catch (error) {
         console.error('Logout error:', error);
-        alert('An error occurred while logging out.');
       }
     });
+
+    // Open Cart Sidebar
+    const cartSidebar = document.getElementById('cartSidebar');
+    document.getElementById('viewCartBtn').addEventListener('click', () => {
+      cartSidebar.classList.add('active');
+      renderCartItems();
+    });
+    // Close Cart Sidebar
+    document.getElementById('closeCartBtn').addEventListener('click', () => {
+      cartSidebar.classList.remove('active');
+    });
+
+    // Load dishes from backend API
+    async function loadDishes() {
+      try {
+        const res = await fetch('http://localhost:8100/dish/get_alldishes', { credentials: 'include' });
+        if (!res.ok) throw new Error("Failed to load dishes");
+        dishes = await res.json();
+        renderDishes();
+      } catch (error) {
+        console.error('Error loading dishes:', error);
+      }
+    }
+
+    // Render dish cards
+    function renderDishes() {
+      const grid = document.getElementById('dishesGrid');
+      grid.innerHTML = dishes.map(dish => {
+        
+        return `
+          <div class="dish-card">
+            
+            <div class="dish-name">${dish.dish_name}</div>
+            <div class="dish-price">$${dish.price.toFixed(2)}</div>
+            <button class="add-to-cart-btn" onclick="addToCart(${dish.id})">Add to Cart</button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Add dish to cart (saved in localStorage)
+    function addToCart(dishId) {
+      const dish = dishes.find(d => d.id === dishId);
+      if (!dish) return;
+      let cart = JSON.parse(localStorage.getItem('cart')) || [];
+      const index = cart.findIndex(item => item.id === dish.id);
+      if (index !== -1) {
+        cart[index].quantity += 1;
+      } else {
+        cart.push({ ...dish, quantity: 1 });
+      }
+      localStorage.setItem('cart', JSON.stringify(cart));
+      updateCartCount();
+      alert(`Added ${dish.dish_name} to cart`);
+    }
+
+    // Update cart counter display
+    function updateCartCount() {
+      let cart = JSON.parse(localStorage.getItem('cart')) || [];
+      const count = cart.reduce((sum, item) => sum + item.quantity, 0);
+      document.getElementById('cartCount').textContent = count;
+    }
+
+    // Render cart items in the sidebar
+    function renderCartItems() {
+      let cart = JSON.parse(localStorage.getItem('cart')) || [];
+      const cartItemsDiv = document.getElementById('cartItems');
+      cartItemsDiv.innerHTML = cart.map(item => `
+        <div class="cart-item">
+          
+          <div>
+            <p>${item.dish_name}</p>
+            <p>$${item.price.toFixed(2)} x ${item.quantity}</p>
+          </div>
+        </div>
+      `).join('');
+      const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+      document.getElementById('cartSubtotal').textContent = subtotal.toFixed(2);
+    }
+
+    // Dummy Checkout: call your API to process the order if needed
+    document.getElementById('checkoutBtn').addEventListener('click', async () => {
+      let cart = JSON.parse(localStorage.getItem('cart')) || [];
+      if (cart.length === 0) {
+        alert('Your cart is empty!');
+        return;
+      }
+      try {
+        const order = { items: cart.map(item => ({ dishId: item.id, quantity: item.quantity })) };
+        const res = await fetch(`${API}/create_order`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(order),
+          credentials: 'include'
+        });
+        if (res.ok) {
+          alert('Order placed successfully!');
+          localStorage.removeItem('cart');
+          updateCartCount();
+          cartSidebar.classList.remove('active');
+        } else {
+          alert('Failed to place order.');
+        }
+      } catch (error) {
+        console.error('Checkout error:', error);
+        alert('Error during checkout.');
+      }
+    });
+    
+    // Initialize page: check session and load dishes
+    async function initPage() {
+      try {
+        const resp = await fetch(`${API}/me`, { credentials: 'include' });
+        if (resp.ok) {
+          const user = await resp.json();
+          if (user.role.toLowerCase() !== 'customer') throw new Error("Not authorized");
+          document.querySelector('.welcome-section p').textContent = `Welcome, ${user.username}`;
+        } else {
+          window.location.href = 'Login.html';
+          return;
+        }
+      } catch (error) {
+        console.error(error);
+        window.location.href = 'Login.html';
+        return;
+      }
+      updateCartCount();
+      loadDishes();
+    }
+    
+    document.addEventListener('DOMContentLoaded', initPage);
   </script>
 </body>
 </html>

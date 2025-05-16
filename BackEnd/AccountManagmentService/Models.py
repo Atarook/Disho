@@ -6,7 +6,7 @@ class Account(db.Model):
     password=db.Column(db.String(100),nullable=False)
     balance=db.Column(db.Float,nullable=True,default=0)
     location=db.Column(db.String(100),nullable=False,default="None")
-    shipping_fees = db.Column(db.Float, default=0)
+    shipping_fees = db.Column(db.Float, default=   0.0)
     role=db.Column(db.Enum('Admin','Customer','Company','Shipping',name='role_enum'),nullable=False)
     def to_json(self):
         return{

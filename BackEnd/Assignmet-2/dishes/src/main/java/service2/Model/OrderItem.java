@@ -1,5 +1,7 @@
 package service2.Model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import jakarta.persistence.*;
 
 @Entity
@@ -20,6 +22,7 @@ public class OrderItem {
     public Long company_id;
 
     @ManyToOne
+    @JsonIgnore
     private Order order;
 
 

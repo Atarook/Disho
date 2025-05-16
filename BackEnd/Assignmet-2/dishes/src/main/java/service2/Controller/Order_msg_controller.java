@@ -1,4 +1,5 @@
 package service2.Controller;
+
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -6,10 +7,9 @@ import jakarta.ws.rs.core.Response;
 import service2.Model.OrderItem;
 import service2.Services.service_msg;
 import java.util.List;
+import java.util.Map;
 
 // filepath: C:/Users/ahmed/OneDrive/Desktop/Assignmet-2/dishes/src/main/java/service2/Controller/Order_msg_controller.java
-
-
 
 @Path("/orders")
 @Produces(MediaType.APPLICATION_JSON)
@@ -23,13 +23,28 @@ public class Order_msg_controller {
     @POST
     @Path("/check-customer-balance")
     public Response checkCustomerBalance(@QueryParam("customerId") long customerId,
-                                         @QueryParam("cost") float cost) {
+            @QueryParam("cost") float cost) {
         try {
             boolean ok = serviceMsg.checkCustomerBalance(customerId, cost);
             return Response.ok(ok).build();
         } catch (Exception e) {
             return Response.serverError().entity(e.getMessage()).build();
         }
+    }
+
+    @GET
+    @Path("GetcompanyOrders")
+    @Produces(MediaType.TEXT_PLAIN)
+    public Response getcompanyOrders(long id) {
+        try {
+            List<Map<String, Object>> orders;
+            orders = (List<Map<String, Object>>) getcompanyOrders(id);
+            return Response.ok(orders).build();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Response.serverError().entity(e.getMessage()).build();
+        }
+
     }
 
     // Endpoint to check dish stock
@@ -47,14 +62,22 @@ public class Order_msg_controller {
     // Endpoint to process an order
     @POST
     @Path("/process")
-    public Response processOrder(@QueryParam("customerId") long customerId, List<OrderItem> cartItems) {
+    public Response processOrder(
+            @QueryParam("customerId") long customerId,
+            List<OrderItem> cartItems,
+            @QueryParam("companyId") long companyId) {
         try {
-            if (serviceMsg.processOrder(customerId, cartItems))
-            return Response.ok("Order processed").build();
-            else
-            return Response.status(Response.Status.BAD_REQUEST).entity("Order processing failed").build();
+            System.out.println("Processing order for customer ID: " + customerId);
+            Map<String, Object> result = serviceMsg.processOrder(customerId, cartItems, companyId);
+            String status = (String) result.get("status");
+            if ("success".equals(status)) {
+                return Response.ok(result).build();
+            } else {
+                return Response.status(Response.Status.BAD_REQUEST).entity(result).build();
+            }
         } catch (Exception e) {
-            return Response.serverError().entity(e.getMessage()).build();
+            return Response.serverError().entity(
+                    Map.of("status", "error", "message", e.getMessage())).build();
         }
     }
 }

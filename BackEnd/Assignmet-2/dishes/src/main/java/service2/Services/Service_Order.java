@@ -5,6 +5,8 @@ package service2.Services;
 import service2.Model.*;
 import service2.DAL.*;
 import com.rabbitmq.client.*;
+import com.rabbitmq.client.impl.AMQImpl.Access.Request;
+
 import jakarta.ejb.Startup;
 import jakarta.ejb.Stateful;
 import jakarta.persistence.EntityManager;
@@ -18,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -55,8 +58,15 @@ public class Service_Order {
     public EntityManager ent;
     private List<OrderItem> cartItems = new ArrayList<>();
 
-    public Service_Order() throws IOException, TimeoutException {
+   public Service_Order() throws IOException, TimeoutException {
+    try {
+        service2.DAL.DatabaseConnection dbConn = new service2.DAL.DatabaseConnection();
+        this.orderItemDAL = new service2.DAL.OrderItemDAL(dbConn.getConnection());
+        this.orderDAL = new service2.DAL.OrderDAL(dbConn.getConnection());
+    } catch (Exception e) {
+        e.printStackTrace();
     }
+}
 
     public void convert(String name, Double price, int id, int quan) {
         OrderItem orderItem = new OrderItem();
@@ -89,7 +99,20 @@ public class Service_Order {
     String response = restTemplate.getForObject(url, String.class);
     return response;
 }
+
+public List<Order> getorder(long custid) throws SQLException {
+    return orderDAL.getOrdersByCustomerId(custid);
+}
+
   
+public String getRequestById(long id) {
+
+    // String Acc = "http://127.0.0.1:5000/get_Acc_info?id=" + id;
+    // String com ="http://127.0.0.1:5000/get_Acc_info?id="
+    return orderItemDAL.getcompanyOrders(id);
+
+}
+
     // public Order soldDish(long id){
         
 
