@@ -26,7 +26,7 @@ public class OrderDAL {
     public void addOrder(Order order) throws SQLException {
         String orderSql = "INSERT INTO `Order` (cost, customer_id, order_status,companyId) VALUES (?, ?, ?, ?)";
         try (PreparedStatement orderStmt = conn.prepareStatement(orderSql, Statement.RETURN_GENERATED_KEYS)) {
-            orderStmt.setLong(1, order.getCost());
+            orderStmt.setFloat(1, order.getCost());
             orderStmt.setLong(2, order.getCustomerId());
             orderStmt.setString(3, order.getOrderStatus());
             orderStmt.setLong(4, order.getCompany_id());

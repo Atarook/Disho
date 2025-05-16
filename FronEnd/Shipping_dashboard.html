@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Shipping Dashboard</title>
+</head>
+<body>
+  <nav>
+    <button id="logoutBtn">Logout</button>
+  </nav>
+
+  <!-- Add your Shipping Dashboard content here -->
+
+  <script>
+    const API = 'http://localhost:5000';
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      try {
+        const resp = await fetch(`${API}/logout`, { method: 'POST', credentials: 'include' });
+        if (resp.ok) {
+          window.location.href = 'Login.html';
+        } else {
+          alert('Logout failed.');
+        }
+      } catch (error) {
+        console.error('Logout error:', error);
+      }
+    });
+  </script>
+</body>
+</html>

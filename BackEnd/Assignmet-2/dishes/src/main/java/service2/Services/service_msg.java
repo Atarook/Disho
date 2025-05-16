@@ -17,12 +17,16 @@ import jakarta.annotation.PreDestroy;
 import jakarta.ejb.PostActivate;
 import jakarta.ejb.Singleton;
 import service2.Model.OrderItem;
-
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.ConnectionFactory;
+import com.rabbitmq.client.BuiltinExchangeType;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+// import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.time.Instant;
-import java.util.List;
+import java.util.List; 
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -42,6 +46,13 @@ public class service_msg {
     private static final String CUSTOMER_QUEUE = "customer_request_queue";
     private static final String DISH_QUEUE = "rpc.check_stock";
     private static final String EXCHANGE = "order_exchange";
+
+    private static final String PAYMENT_EXCHANGE = "payments_exchange";
+    private static final String PAYMENT_FAILED_ROUTING_KEY = "PaymentFailed";
+
+
+    private static final String LOG_EXCHANGE = "log_exchange";
+
 
     private Connection connection;
     private Channel channel;
@@ -64,6 +75,11 @@ public class service_msg {
         channel.queueDeclare(DISH_QUEUE, true, false, false, null);
         channel.queueBind(DISH_QUEUE, EXCHANGE, "dish");
 
+        channel.exchangeDeclare(LOG_EXCHANGE, BuiltinExchangeType.TOPIC, true);
+
+
+        channel.queueDeclare(PAYMENT_EXCHANGE, true, false, false, null);
+        channel.queueBind(PAYMENT_EXCHANGE, EXCHANGE, PAYMENT_FAILED_ROUTING_KEY);
         // Create a private reply-to queue for this service
         // replyQueueName = channel.queueDeclare().getQueue();
         replyQueueName = channel.queueDeclare(
@@ -73,7 +89,49 @@ public class service_msg {
                 false, // <--- autoDelete = false
                 null).getQueue();
     }
+private void logEvent(String serviceName, String severity, String message) throws IOException {
+    
+    String routingKey = severity;
+    ObjectNode logMsg = mapper.createObjectNode();
+    logMsg.put("service", serviceName);
+    logMsg.put("severity", severity);
+    logMsg.put("message", message);
+    logMsg.put("timestamp", Instant.now().toString());
+    channel.basicPublish(
+        LOG_EXCHANGE,
+        routingKey,
+        null,
+        mapper.writeValueAsBytes(logMsg)
+    );
+}
 
+    private void notifyAdminPaymentFailed(long customerId, float cost) throws IOException {
+    channel.exchangeDeclare(PAYMENT_EXCHANGE, BuiltinExchangeType.DIRECT, true);
+    ObjectNode event = mapper.createObjectNode();
+    event.put("event", "PaymentFailed");
+    event.put("customerId", customerId);
+    event.put("cost", cost);
+    channel.basicPublish(
+        PAYMENT_EXCHANGE,
+        PAYMENT_FAILED_ROUTING_KEY,
+        null,
+        mapper.writeValueAsBytes(event)
+    );
+}
+
+private void notifyAdminPaymentFailed2(long customerId, float cost) throws IOException {
+    channel.exchangeDeclare(PAYMENT_EXCHANGE, BuiltinExchangeType.DIRECT, true);
+    ObjectNode event = mapper.createObjectNode();
+    event.put("event", "MINIMUM_COST_NOT_MET");
+    event.put("customerId", customerId);
+    event.put("cost", cost);
+    channel.basicPublish(
+        PAYMENT_EXCHANGE,
+        PAYMENT_FAILED_ROUTING_KEY,
+        null,
+        mapper.writeValueAsBytes(event)
+    );
+}
     public service_msg() throws IOException, TimeoutException {
         init();
     }
@@ -167,6 +225,12 @@ public class service_msg {
         System.out.println("↪ [DEBUG] raw stock‐check reply = `" + response + "`");
         if (response == null) {
             System.out.println("↪ [DEBUG] Stock-check timed out after 1 minute");
+                try {
+                    logEvent("Order", "*_Error", "Stock-check timed out after 1 minute: " );
+                } catch (IOException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
             return true;
         }
         // channel.basicCancel(ctag);
@@ -214,6 +278,15 @@ public class service_msg {
             }
 
             if (cost < minimumCost) {
+                try {
+                    logEvent("Order", "*_Error", "The minimum charge is not met");
+
+                    notifyAdminPaymentFailed2(customerId, cost);
+                } catch (Exception e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+
                 result.put("status", "failed");
                 result.put("message", "The minimum charge is not met");
                 result.put("orderStatus", "Rejected");
@@ -226,6 +299,14 @@ public class service_msg {
 
             // Step 1: Verify customer balance
             if (!checkCustomerBalance(customerId, cost)) {
+                try {
+                    logEvent("Order", "*_Error", "Insufficient funds for customer: " + customerId);
+                    notifyAdminPaymentFailed(customerId, cost);
+                } catch (Exception e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+
                 System.out.println("Insufficient funds for customer: " + customerId);
                 orderDAL.deleteOrder(order.getId());
                 result.put("status", "failed");
@@ -236,6 +317,12 @@ public class service_msg {
 
             // Step 2: Verify dish stock
             if (checkDishStock(cartItems)) {
+                try {
+                    logEvent("Order", "Error", "Insufficient stock for order items");
+                } catch (Exception e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
                 ObjectNode commitCust = mapper.createObjectNode();
                 commitCust.put("customerId", customerId);
                 commitCust.put("cost", cost);

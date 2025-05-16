@@ -6,32 +6,61 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dishes Platform - Admin Dashboard</title>
   <link rel="stylesheet" href="css/styles.css">
+  <style>
+    /* Inline or move into css/styles.css */
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8f9fa; margin: 0; padding: 0; }
+    .main-nav { background: #3498db; color: white; display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; }
+    .logo { font-size: 1.4em; font-weight: bold; }
+    .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; }
+    .btn-primary { background: #2ecc71; color: white; }
+    .btn-secondary { background: #e74c3c; color: white; }
+    .main-container { max-width: 1000px; margin: 30px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    .welcome-section { text-align: center; margin-bottom: 30px; }
+    .features { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+    .feature-card { background: #fff; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); padding: 20px; }
+    .feature-card h2 { margin-top: 0; color: #34495e; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; margin-bottom: 5px; color: #555; }
+    input, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+    .message { padding: 10px; border-radius: 4px; margin-top: 15px; display: none; }
+    .message.success { background: #ddffdd; color: #00aa00; }
+    .message.error { background: #ffdddd; color: #ff0000; }
+    ul { list-style: none; padding: 0; }
+    li { padding: 5px 0; }
+  </style>
 </head>
 <body>
   <nav class="main-nav">
-    <div class="nav-left">
-      <div class="logo">Dishes Platform</div>
-    </div>
-    <div class="nav-right">
-      <button class="btn btn-secondary" id="logoutBtn">Logout</button>
-    </div>
+    <div class="logo">Dishes Platform</div>
+    <button id="logoutBtn" class="btn btn-secondary">Logout</button>
   </nav>
 
   <div class="main-container">
     <div class="welcome-section">
       <h1>Admin Dashboard</h1>
-      <p id="welcomeMsg" style="text-align:center; font-weight:500; color:#34495e;"></p>
+      <p id="welcomeMsg" style="font-weight:500; color:#34495e;"></p>
     </div>
 
     <div class="features">
+      <!-- All Customers -->
       <div class="feature-card">
         <h2>All Customers</h2>
         <ul id="customerList"></ul>
       </div>
+
+      <!-- Dish Companies -->
       <div class="feature-card">
-        <h2>All Companies</h2>
-        <ul id="companyList"></ul>
+        <h2>Dish Companies</h2>
+        <ul id="dishCompanyList"></ul>
       </div>
+
+      <!-- Shipping Companies -->
+      <div class="feature-card">
+        <h2>Shipping Companies</h2>
+        <ul id="shippingCompanyList"></ul>
+      </div>
+
+      <!-- Create Company -->
       <div class="feature-card">
         <h2>Create Company</h2>
         <form id="companyForm">
@@ -43,9 +72,20 @@
             <label for="newCompanyLocation">Location</label>
             <input type="text" id="newCompanyLocation" required>
           </div>
+          <div class="form-group">
+            <label for="newCompanyRole">Role</label>
+            <select id="newCompanyRole" required>
+              <option value="Company">Dish Company</option>
+              <option value="Shipping">Shipping Company</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="newShippingFees">Shipping Fees</label>
+            <input type="number" id="newShippingFees" step="0.01" min="0" value="0" required>
+          </div>
           <button type="submit" class="btn btn-primary">Create</button>
         </form>
-        <div id="companyMessage" class="message" style="display:none;"></div>
+        <div id="companyMessage" class="message"></div>
       </div>
     </div>
   </div>
@@ -57,103 +97,96 @@
       const container = document.querySelector('.main-container');
 
       try {
-        const res = await fetch(`${API}/me`, { credentials: 'include' });
-        if (!res.ok) throw new Error('Not authenticated');
-        const user = await res.json();
-
-        if (user.role !== 'Admin') {
-          container.innerHTML = `
-            <div class="welcome-section">
-              <h1>Unauthorized</h1>
-              <p style="color:red; text-align:center;">You are not authorized to view this page.</p>
-              <div style="text-align:center; margin-top:20px;">
-                <button class="btn btn-primary" onclick="window.location.href='Login.html'">Go to Login</button>
-              </div>
-            </div>
-          `;
-          return;
-        }
-
-        document.getElementById('welcomeMsg').textContent = `Welcome, ${user.username}`;
+        // Check authentication & admin role
+        const meRes = await fetch(`${API}/me`, { credentials: 'include' });
+        if (!meRes.ok) throw new Error();
+        const me = await meRes.json();
+        if (me.role !== 'Admin') throw new Error();
+        document.getElementById('welcomeMsg').textContent = `Welcome, ${me.username}`;
 
         // Load all customers
-        fetch(`${API}/list_all_customer`, { credentials: 'include' })
-          .then(res => res.json())
-          .then(data => {
-            document.getElementById('customerList').innerHTML =
-              data.map(c => `<li>${c.username} (Balance: ${c.balance})</li>`).join('');
-          });
+        const custRes = await fetch(`${API}/list_all_customer`, { credentials: 'include' });
+        const customers = await custRes.json();
+        document.getElementById('customerList').innerHTML =
+          customers.map(c => `<li>${c.username} (Balance: ${c.balance})</li>`).join('');
 
-        // Load all companies
-        fetch(`${API}/list_all_companies`, { credentials: 'include' })
-          .then(res => res.json())
-          .then(data => {
-            document.getElementById('companyList').innerHTML =
-              data.map(c => `<li>${c.username} (Location: ${c.location})</li>`).join('');
-          });
+        // Load dish companies
+        const dishRes = await fetch(`${API}/list_all_companies`, { credentials: 'include' });
+        const dishComps = await dishRes.json();
+        document.getElementById('dishCompanyList').innerHTML =
+          dishComps.map(c => `<li>${c.username} (Location: ${c.location})</li>`).join('');
 
-        // Handle company creation
+        // Load shipping companies
+        const shipRes = await fetch(`${API}/list_all_shipping_companies`, { credentials: 'include' });
+        const shipComps = await shipRes.json();
+        document.getElementById('shippingCompanyList').innerHTML =
+          shipComps.map(c =>
+            `<li>${c.username} (Location: ${c.location}, Shipping Fees: ${c.shipping_fees})</li>`
+          ).join('');
+
+        // Create company form handler
         document.getElementById('companyForm').addEventListener('submit', async e => {
           e.preventDefault();
-          const username = document.getElementById('newCompanyUsername').value;
-          const location = document.getElementById('newCompanyLocation').value;
-          const res = await fetch(`${API}/create_company`, {
+          const username     = document.getElementById('newCompanyUsername').value;
+          const location     = document.getElementById('newCompanyLocation').value;
+          const role         = document.getElementById('newCompanyRole').value;
+          const shippingFees = parseFloat(document.getElementById('newShippingFees').value);
+
+          const resp = await fetch(`${API}/create_company`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ username, location })
+            body: JSON.stringify({ username, location, role, shipping_fees: shippingFees })
           });
-          const data = await res.json();
-          const msg = document.getElementById('companyMessage');
-          if (res.ok) {
+          const data = await resp.json();
+          const msg  = document.getElementById('companyMessage');
+
+          if (resp.ok) {
             msg.textContent = `Created ${data.username}, password: ${data.password}`;
             msg.className = 'message success';
+
+            // Refresh company lists
+            const [dRes, sRes] = await Promise.all([
+              fetch(`${API}/list_all_companies`, { credentials: 'include' }),
+              fetch(`${API}/list_all_shipping_companies`, { credentials: 'include' })
+            ]);
+            const updatedDish = await dRes.json();
+            const updatedShip = await sRes.json();
+
+            document.getElementById('dishCompanyList').innerHTML =
+              updatedDish.map(c => `<li>${c.username} (Location: ${c.location})</li>`).join('');
+            document.getElementById('shippingCompanyList').innerHTML =
+              updatedShip.map(c =>
+                `<li>${c.username} (Location: ${c.location}, Shipping Fees: ${c.shipping_fees})</li>`
+              ).join('');
           } else {
-            if (data.error.includes('same username')) {
-              msg.textContent = '⚠️ A company with this username already exists. Please choose a different one.';
-            } else {
-              msg.textContent = data.error;
-            }
+            msg.textContent = data.error?.includes('same username')
+              ? '⚠️ A company with this username already exists.'
+              : data.error || 'Error creating company.';
             msg.className = 'message error';
           }
           msg.style.display = 'block';
         });
 
-        // Logout
+        // Logout button
         document.getElementById('logoutBtn').addEventListener('click', async () => {
           await fetch(`${API}/logout`, { method: 'POST', credentials: 'include' });
           window.location.href = 'Login.html';
         });
 
-      } catch (error) {
+      } catch {
+        // Unauthorized view
         container.innerHTML = `
           <div class="welcome-section">
             <h1>Unauthorized</h1>
-            <p style="color:red; text-align:center;">You are not logged in or lack permission to view this page.</p>
+            <p style="color:red;">You are not permitted to view this page.</p>
             <div style="text-align:center; margin-top:20px;">
               <button class="btn btn-primary" onclick="window.location.href='Login.html'">Go to Login</button>
             </div>
           </div>
         `;
       }
-    });
+    }); 
   </script>
-
-  <!-- styles.css -->
-  <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8f9fa; margin: 0; padding: 0; }
-    .container { max-width: 800px; margin: 40px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-    h1 { text-align: center; color: #2c3e50; }
-    .section { margin-bottom: 30px; }
-    .form-group { margin-bottom: 15px; }
-    input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius:4px; }
-    button { background: #3498db; color: white; padding: 10px 20px; border:none; border-radius:4px; cursor:pointer; }
-    button:hover { background: #2980b9; }
-    .message { padding:10px; border-radius:4px; margin-top:10px; }
-    .message.success { background: #ddffdd; color:#00aa00; }
-    .message.error { background: #ffdddd; color:#ff0000; }
-    ul { list-style:none; padding:0; }
-    li { padding:5px 0; }
-  </style>
 </body>
 </html>

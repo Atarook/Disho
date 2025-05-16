@@ -3,19 +3,29 @@ import pika
 from flask import Blueprint, request, jsonify, session
 from flask_sqlalchemy import SQLAlchemy
 import secrets
+import datetime
+from typing import Optional
 
 from database import db
 from Models import Account
 routes = Blueprint("routes", __name__)
 
+LOG_EXCHANGE = "log_exchange"
+LOG_ROUTING_KEY_INFO = "AccountService_Info"
+LOG_ROUTING_KEY_ERROR = "AccountService_Error"
+
 @routes.route('/register', methods=["POST"])
 def register():
+    log_channel = setup_logging()
     data = request.get_json() or {}
+    
     for field in ("username", "password", "balance","location"):
         if field not in data:
             return jsonify({"error": f"Missing field: {field}"}), 400
 
     if Account.query.filter_by(username=data["username"]).first():
+        if log_channel:
+            log_event(log_channel, "Error", f"Registration failed - Username already exists: {data['username']}")
         return jsonify({"error": "Username already exists"}), 400
 
     user = Account(
@@ -30,24 +40,35 @@ def register():
     session["username"]   = user.username
     session["id"]=user.id
     session["user_role"]  = user.role
+    if log_channel:
+        log_event(log_channel, "Info", f"New user registered: {user.username}")
     return jsonify({"message": f"Registered {user.username}"}), 201
 
 
 
 @routes.route('/login', methods=["POST"])
 def login():
+    log_channel = setup_logging()
     data = request.get_json() or {}
+    
     for field in ("username", "password"):
         if field not in data:
+            if log_channel:
+                log_event(log_channel, "Error", f"Login failed - Missing field: {field}")
             return jsonify({"error": f"Missing field: {field}"}), 400
 
     user = Account.query.filter_by(username=data["username"]).first()
     if not user or user.password != data["password"]:
+        if log_channel:
+            log_event(log_channel, "Error", f"Login failed - Invalid credentials for user: {data['username']}")
         return jsonify({"error": "Invalid credentials"}), 401
 
-    session["username"]  = user.username
-    session["id"]=user.id
+    session["username"] = user.username
+    session["id"] = user.id
     session["user_role"] = user.role
+    
+    if log_channel:
+        log_event(log_channel, "Info", f"User {user.username} logged in successfully")
     return jsonify({"message": "Login successful"}), 200
 
 
@@ -96,7 +117,9 @@ def me():
     return jsonify({
         "id": user.id,
         "username": user.username,
-        "role": user.role
+        "role": user.role,
+        "location":user.location,
+        "balance":user.balance
     }), 200
     
     
@@ -133,8 +156,21 @@ def list_all_companies():
     return jsonify([account.to_json() for account in accounts]), 200
 
 
+@routes.route('/list_all_shipping_companies', methods=["GET"])
+def list_all_shipping_companies():
+    id=session.get("id")
+    if not id:
+        return jsonify({"error": "Not logged in"}), 401
+    user = Account.query.filter_by(id=id).first()
+    if user.role !='Admin':
+        return jsonify({"error": "Not an admin"}), 403
+    accounts = Account.query.filter_by(role="Shipping").all()
+    return jsonify([account.to_json() for account in accounts]), 200
+
+
 @routes.route('/create_company',methods=["POST"])
 def create_company():
+    log_channel = setup_logging()
     data = request.get_json() or {}
     for field in ("username","location","role","shipping_fees"):
         if field not in data:
@@ -148,7 +184,9 @@ def create_company():
     Company = Account.query.filter_by(username=data["username"]).first()
 
     if Company:
-        return jsonify({"error": "There is a company with the same username "}), 401
+        if log_channel:
+            log_event(log_channel, "Error", f"Company creation failed - Company already exists: {data['username']}")
+        return jsonify({"error": "There is a company with the same username"}), 401
     Company = Account(
         username=data["username"],
         
@@ -159,6 +197,8 @@ def create_company():
     )
     db.session.add(Company)
     db.session.commit()
+    if log_channel:
+        log_event(log_channel, "Info", f"New company created: {Company.username} in location: {Company.location}")
     return jsonify({"message": "Company created successfully",
     "username": Company.username,
     "password": Company.password}), 200
@@ -192,6 +232,16 @@ def location():
         "balance":  shipping.balance
     }),200
         
+@routes.route('/get_shipping_companies_by_location', methods=["GET"])
+def get_shipping_companies_by_location():
+    location = request.args.get("location")
+    if not location:
+        return jsonify({"error": "Location parameter is required"}), 400
+    
+    shipping_companies = Account.query.filter_by(role="Shipping", location=location).all()
+    if not shipping_companies:
+        return jsonify({"error": "No shipping companies found for this location"}), 404
+    return jsonify([company.to_json() for company in shipping_companies]), 200
            
 RABBITMQ_PARAMS = pika.ConnectionParameters(
     host="localhost",
@@ -201,13 +251,28 @@ RABBITMQ_PARAMS = pika.ConnectionParameters(
 EXCHANGE     = "order_exchange"
 ROUTING_KEY  = "customer"
 QUEUE_NAME   = "customer_request_queue"
+# PAYMENT_EXCHANGE = "payments_exchange"
+# PAYMENT_FAILED_ROUTING_KEY = "PaymentFailed"
+
+# def notify_admin_payment_failed(customer_id, cost):
+#     connection = pika.BlockingConnection(RABBITMQ_PARAMS)
+#     channel = connection.channel()
+#     channel.exchange_declare(exchange=PAYMENT_EXCHANGE, exchange_type="direct", durable=True)
+#     event = {
+#         "event": "PaymentFailed",
+#         "customerId": customer_id,
+#         "cost": cost
+#     }
+#     channel.basic_publish(
+#         exchange=PAYMENT_EXCHANGE,
+#         routing_key=PAYMENT_FAILED_ROUTING_KEY,
+#         body=json.dumps(event)
+#     )
+#     connection.close()
 
 def on_customer_request(ch, method, props, body, flask_app):
-    """
-    Callback for each incoming RPC request from OrderService.
-    Parses JSON {customerId, cost, timestamp}, checks/deducts balance,
-    and replies "YES"/"NO" to props.reply_to.
-    """
+    log_channel = setup_logging()
+    
     with flask_app.app_context():
         try:
             min_charge=10.0
@@ -223,6 +288,8 @@ def on_customer_request(ch, method, props, body, flask_app):
                 print(f"[CustomerRPC] Deducting {cost} from {acct.username}")
                 acct.balance -= cost
                 db.session.commit()
+                if log_channel:
+                    log_event(log_channel, "Info", f"Balance deducted: {cost} from user {acct.username}")
             elif ok and deduct=="false":
                 print(f"[CustomerRPC] No stock {acct.username}")
                 acct.balance += cost
@@ -230,6 +297,10 @@ def on_customer_request(ch, method, props, body, flask_app):
             elif not ok:
                 print(f"[CustomerRPC] Insufficient funds for customer {cid}")
                 db.session.rollback()
+                if log_channel:
+                    log_event(log_channel, "Error", f"Insufficient funds for customer {cid}, required: {cost}")
+                # Notify admins of payment failure
+                # notify_admin_payment_failed(cid, cost)
             else:
                 print(f"[CustomerRPC] Balance check passed for customer {cid}")
 
@@ -237,6 +308,8 @@ def on_customer_request(ch, method, props, body, flask_app):
         except Exception as e:
             print(f"[CustomerRPC] Error: {e}")
             db.session.rollback()
+            if log_channel:
+                log_event(log_channel, "Error", f"RPC request failed: {str(e)}")
             response = "false"
     
     # Only try to reply if we have a valid reply_to queue
@@ -293,3 +366,46 @@ def start_customer_rpc_server(flask_app):
     )
     print(f"[CustomerRPC] Listening on {QUEUE_NAME} ...")
     channel.start_consuming()
+
+def log_event(channel, severity: str, message: str):
+    """
+    Publishes log messages to the log exchange
+    severity: "Info" or "Error"
+    """
+    try:
+        routing_key = f"AccountService_{severity}"
+        log_message = {
+            "service": "AccountService",
+            "severity": severity,
+            "message": message,
+            "timestamp": datetime.datetime.now().isoformat()
+        }
+        
+        channel.basic_publish(
+            exchange=LOG_EXCHANGE,
+            routing_key=routing_key,
+            body=json.dumps(log_message),
+            properties=pika.BasicProperties(
+                delivery_mode=2  # make message persistent
+            )
+        )
+    except Exception as e:
+        print(f"Failed to log message: {e}")
+
+# Initialize RabbitMQ connection and channel for logging
+def setup_logging():
+    try:
+        connection = pika.BlockingConnection(RABBITMQ_PARAMS)
+        channel = connection.channel()
+        
+        # Declare the logging exchange
+        channel.exchange_declare(
+            exchange=LOG_EXCHANGE,
+            exchange_type="topic",
+            durable=True
+        )
+        
+        return channel
+    except Exception as e:
+        print(f"Failed to setup logging: {e}")
+        return None

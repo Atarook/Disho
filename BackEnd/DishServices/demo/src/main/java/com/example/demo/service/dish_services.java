@@ -1,8 +1,11 @@
 package com.example.demo.service;
 
+import java.io.IOException;
 import java.nio.file.AccessDeniedException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeoutException;
 
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.messaging.handler.annotation.Payload;
@@ -13,13 +16,14 @@ import com.example.demo.Repo.dish_Repo;
 import com.example.demo.model.Dish;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.rabbitmq.client.BuiltinExchangeType;
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
 
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
-
-import com.rabbitmq.client.Connection;
-import com.rabbitmq.client.Channel;
 
 @Service
 public class dish_services {
@@ -30,6 +34,22 @@ public class dish_services {
     }
 
     private final static String QUEUE_NAME = "hello";
+    private static final String LOG_EXCHANGE = "log_exchange";
+    private Connection connection;
+    private Channel channel;
+    private static final ObjectMapper mapper = new ObjectMapper();
+
+    // Add to constructor or create a @PostConstruct method
+    @jakarta.annotation.PostConstruct
+    public void init() throws IOException, TimeoutException {
+        ConnectionFactory factory = new ConnectionFactory();
+        factory.setHost("localhost");
+        connection = factory.newConnection();
+        channel = connection.createChannel();
+        
+        // Declare the logging exchange
+        channel.exchangeDeclare(LOG_EXCHANGE, BuiltinExchangeType.TOPIC, true);
+    }
 
     public void AddDish(Dish dish) {
         dishRepo.save(dish);
@@ -232,4 +252,31 @@ public void UpdateDish(Dish incoming) throws AccessDeniedException {
 public List<Dish> listAll() {
     return dishRepo.findAll();
   }
+
+// Add the logEvent method
+private void logEvent(String serviceName, String severity, String message) throws IOException {
+    String routingKey = severity;
+    ObjectNode logMsg = mapper.createObjectNode();
+    logMsg.put("service", serviceName);
+    logMsg.put("severity", severity);
+    logMsg.put("message", message);
+    logMsg.put("timestamp", Instant.now().toString());
+    channel.basicPublish(
+        LOG_EXCHANGE,
+        routingKey,
+        null,
+        mapper.writeValueAsBytes(logMsg)
+    );
+}
+
+// Add cleanup method
+@jakarta.annotation.PreDestroy
+public void teardown() throws IOException, TimeoutException {
+    if (channel != null && channel.isOpen()) {
+        channel.close();
+    }
+    if (connection != null && connection.isOpen()) {
+        connection.close();
+    }
+}
 }

@@ -4,7 +4,7 @@ import threading
 from flask import Flask
 from flask_cors import CORS
 from dotenv import load_dotenv
-
+import logs
 from database import db
 from Models import Account
 import routes  # our Blueprint + RPC server code
@@ -29,6 +29,7 @@ db.init_app(app)
 # Register your routes (HTTP + RPC)
 app.register_blueprint(routes.routes)
 
+import Admin
 # Create tables & default admin
 with app.app_context():
     db.create_all()
@@ -44,9 +45,13 @@ with app.app_context():
     
 
 if __name__ == "__main__":
+    
     # Pass the app to the RPC server
     rpc_thread = threading.Thread(target=routes.start_customer_rpc_server, args=(app,), daemon=True)
     rpc_thread.start()
-    
+    thread2=threading.Thread(target=Admin.wait, args=(app,), daemon=True)
+    thread3=threading.Thread(target=logs.admin_error_log_consumer, args=(app,), daemon=True)
+    thread2.start()
+    thread3.start()
     # Start Flask web server
     app.run(debug=True)

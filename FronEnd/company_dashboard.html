@@ -23,11 +23,26 @@
     .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; }
     .btn-primary { background: #2ecc71; color: white; }
     .btn-secondary { background: #e74c3c; color: white; }
-    .container { max-width: 900px; margin: 30px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    .container {
+      max-width: 900px;
+      margin: 30px auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
     h1 { text-align: center; color: #34495e; }
     section { margin-top: 30px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { padding: 8px; border: 1px solid #ddd; text-align: left; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th, td {
+      padding: 8px;
+      border: 1px solid #ddd;
+      text-align: left;
+    }
     th { background: #ecf0f1; }
     .form-group { margin-bottom: 15px; }
     label { display: block; margin-bottom: 5px; color: #555; }
@@ -36,6 +51,7 @@
     .message { margin-top: 10px; padding: 10px; border-radius: 4px; }
     .message.success { background: #dff0d8; color: #3c763d; }
     .message.error   { background: #f2dede; color: #a94442; }
+    pre { background: #f8f8f8; padding: 10px; border-radius: 4px; overflow-x: auto; }
   </style>
 </head>
 <body>
@@ -105,10 +121,18 @@
       </form>
       <div id="updMsg" class="message" style="display:none;"></div>
     </section>
+
+    <!-- Company Orders -->
+    <section>
+      <h2>Company Orders</h2>
+      <button id="refreshOrdersBtn" class="btn btn-primary">Refresh Orders</button>
+      <pre id="ordersContainer">Loading orders...</pre>
+    </section>
   </div>
 
   <script>
-    const API = 'http://localhost:8100/dish';
+    const DISH_API = 'http://localhost:8100/dish';
+    const ORDER_API = 'http://localhost:8088/dishes/api/hell/GetcompanyOrders';
     let companyId = null;
 
     function show(id, text, type='success') {
@@ -132,11 +156,10 @@
       }
     }
 
-    // ← UPDATED: hit /get_sales?companyId=…
     async function loadSaleDishes() {
       const tbody = document.querySelector('#dishesTable tbody');
       try {
-        const list = await (await fetch(`${API}/get_sales?companyId=${companyId}`, { credentials: 'include' })).json();
+        const list = await (await fetch(`${DISH_API}/get_sales?companyId=${companyId}`, { credentials: 'include' })).json();
         tbody.innerHTML = list.map(d =>
           `<tr><td>${d.dish_name}</td><td>${d.price.toFixed(2)}</td><td>${d.amount}</td></tr>`
         ).join('');
@@ -145,46 +168,62 @@
       }
     }
 
-    // ← UPDATED: hit /get_dishes?companyId=…
     async function loadAllCompanyDishes() {
       try {
-        const list = await (await fetch(`${API}/get_dishes?companyId=${companyId}`, { credentials: 'include' })).json();
+        const list = await (await fetch(`${DISH_API}/get_dishes?companyId=${companyId}`, { credentials: 'include' })).json();
         const select = document.getElementById('updName');
         select.innerHTML = list.map(d =>
           `<option value="${d.id}" data-sale="${d.sale}">${d.dish_name} (${d.sale ? 'On Sale' : 'Not On Sale'})</option>`
         ).join('');
-
-        select.addEventListener('change', function() {
+        select.addEventListener('change', () => {
           document.getElementById('updSale').checked =
-            this.options[this.selectedIndex].getAttribute('data-sale') === 'true';
+            select.options[select.selectedIndex].getAttribute('data-sale') === 'true';
         });
-        if (select.options.length > 0) select.dispatchEvent(new Event('change'));
+        if (select.options.length) select.dispatchEvent(new Event('change'));
       } catch {
         show('updMsg',"Couldn't load dishes for update",'error');
       }
     }
 
-    async function refreshDishes() {
-      await loadSaleDishes();
-      await loadAllCompanyDishes();
+    async function loadCompanyOrders() {
+      try {
+        const resp = await fetch(`${ORDER_API}?id=${companyId}`);
+        if (!resp.ok) throw new Error('Order fetch failed');
+        const orders = await resp.json();
+        document.getElementById('ordersContainer').textContent = JSON.stringify(orders, null, 2);
+      } catch (err) {
+        document.getElementById('ordersContainer').textContent = 'Error loading orders: ' + err.message;
+      }
     }
 
-    document.getElementById('refreshBtn').addEventListener('click', refreshDishes);
+    async function refreshAll() {
+      await Promise.all([
+        loadSaleDishes(),
+        loadAllCompanyDishes(),
+        loadCompanyOrders()
+      ]);
+    }
 
+    document.getElementById('refreshBtn').addEventListener('click', refreshAll);
+    document.getElementById('refreshOrdersBtn').addEventListener('click', loadCompanyOrders);
+
+    // Add Dish
     document.getElementById('addDishForm').addEventListener('submit', async e => {
       e.preventDefault();
-      const name = document.getElementById('newName').value;
-      const price = parseFloat(document.getElementById('newPrice').value);
-      const amount = parseInt(document.getElementById('newQuantity').value,10);
+      const body = {
+        dish_name: document.getElementById('newName').value,
+        price: parseFloat(document.getElementById('newPrice').value),
+        amount: parseInt(document.getElementById('newQuantity').value, 10),
+        sale: true,
+        company_id: companyId
+      };
       try {
-        const res = await fetch(`${API}/adddish`, {
-          method: 'POST',
-          headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ dish_name:name, price, amount, sale:true, company_id: companyId })
+        const res = await fetch(`${DISH_API}/adddish`, {
+          method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
         });
         if (res.ok) {
           show('addMsg','Dish added');
-          refreshDishes();
+          refreshAll();
           e.target.reset();
         } else {
           const err = await res.json().catch(() => ({}));
@@ -195,38 +234,42 @@
       }
     });
 
+    // Update Dish
     document.getElementById('updateDishForm').addEventListener('submit', async e => {
       e.preventDefault();
-      const id = parseInt(document.getElementById('updName').value, 10);
-      const price = parseFloat(document.getElementById('updPrice').value);
-      const amount = parseInt(document.getElementById('updQuantity').value, 10);
-      const sale = document.getElementById('updSale').checked;
+      const body = {
+        id:     parseInt(document.getElementById('updName').value, 10),
+        price:  parseFloat(document.getElementById('updPrice').value),
+        amount: parseInt(document.getElementById('updQuantity').value, 10),
+        sale:   document.getElementById('updSale').checked,
+        company_id: companyId
+      };
       try {
-        const res = await fetch(`${API}/updateDish`, {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ id, price, amount, sale, company_id: companyId })
+        const res = await fetch(`${DISH_API}/updateDish`, {
+          method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
         });
         if (res.ok) {
           show('updMsg','Dish updated successfully');
-          refreshDishes();
+          refreshAll();
         } else {
           const err = await res.json().catch(() => ({}));
           show('updMsg', err.message || 'Update failed','error');
         }
       } catch (err) {
-        show('updMsg','Update failed - ' + err.message,'error');
+        show('updMsg','Update failed - '+err.message,'error');
       }
     });
 
+    // Logout
     document.getElementById('logoutBtn').addEventListener('click', async () => {
-      await fetch('http://localhost:5000/logout',{method:'POST', credentials:'include'});
+      await fetch('http://localhost:5000/logout',{ method:'POST', credentials:'include' });
       window.location.href='login.html';
     });
 
+    // Boot
     (async ()=> {
       await loadSession();
-      await refreshDishes();
+      await refreshAll();
     })();
   </script>
 </body>
