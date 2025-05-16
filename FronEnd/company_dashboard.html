@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dishes Platform – Company Dashboard</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f0f2f5;
+      margin: 0;
+      padding: 0;
+    }
+    .main-nav {
+      background: #3498db;
+      color: white;
+      padding: 10px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .main-nav .logo { font-size: 1.4em; font-weight: bold; }
+    .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; }
+    .btn-primary { background: #2ecc71; color: white; }
+    .btn-secondary { background: #e74c3c; color: white; }
+    .container { max-width: 900px; margin: 30px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    h1 { text-align: center; color: #34495e; }
+    section { margin-top: 30px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { padding: 8px; border: 1px solid #ddd; text-align: left; }
+    th { background: #ecf0f1; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; margin-bottom: 5px; color: #555; }
+    input, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+    input[type="checkbox"] { width: auto; margin-left: 0; }
+    .message { margin-top: 10px; padding: 10px; border-radius: 4px; }
+    .message.success { background: #dff0d8; color: #3c763d; }
+    .message.error   { background: #f2dede; color: #a94442; }
+  </style>
+</head>
+<body>
+  <nav class="main-nav">
+    <div class="logo">Dishes Platform</div>
+    <button id="logoutBtn" class="btn btn-secondary">Logout</button>
+  </nav>
+
+  <div class="container">
+    <h1>Company Dashboard</h1>
+    <p id="welcomeMsg" style="text-align:center; color:#34495e; font-weight:500;"></p>
+
+    <!-- All On‑Sale Dishes -->
+    <section>
+      <h2>All On‑Sale Dishes</h2>
+      <button id="refreshBtn" class="btn btn-primary">Refresh List</button>
+      <table id="dishesTable">
+        <thead>
+          <tr><th>Name</th><th>Price</th><th>Quantity</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <!-- Add New Dish -->
+    <section>
+      <h2>Add Dish</h2>
+      <form id="addDishForm">
+        <div class="form-group">
+          <label for="newName">Name</label>
+          <input id="newName" required>
+        </div>
+        <div class="form-group">
+          <label for="newPrice">Price</label>
+          <input type="number" id="newPrice" step="0.01" min="0" required>
+        </div>
+        <div class="form-group">
+          <label for="newQuantity">Quantity</label>
+          <input type="number" id="newQuantity" min="0" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Add Dish</button>
+      </form>
+      <div id="addMsg" class="message" style="display:none;"></div>
+    </section>
+
+    <!-- Update Dish -->
+    <section>
+      <h2>Update Dish</h2>
+      <form id="updateDishForm">
+        <div class="form-group">
+          <label for="updName">Dish</label>
+          <select id="updName" required></select>
+        </div>
+        <div class="form-group">
+          <label for="updPrice">New Price</label>
+          <input type="number" id="updPrice" step="0.01" min="0" required>
+        </div>
+        <div class="form-group">
+          <label for="updQuantity">New Quantity</label>
+          <input type="number" id="updQuantity" min="0" required>
+        </div>
+        <div class="form-group">
+          <label for="updSale">On Sale?</label>
+          <input type="checkbox" id="updSale">
+        </div>
+        <button type="submit" class="btn btn-primary">Update Dish</button>
+      </form>
+      <div id="updMsg" class="message" style="display:none;"></div>
+    </section>
+  </div>
+
+  <script>
+    const API = 'http://localhost:8100/dish';
+    let companyId = null;
+
+    function show(id, text, type='success') {
+      const el = document.getElementById(id);
+      el.textContent = text;
+      el.className = `message ${type}`;
+      el.style.display = 'block';
+      setTimeout(() => el.style.display = 'none', 4000);
+    }
+
+    async function loadSession() {
+      try {
+        const resp = await fetch('http://localhost:5000/me', { credentials: 'include' });
+        if (!resp.ok) throw '';
+        const user = await resp.json();
+        if (user.role !== 'Company') throw '';
+        companyId = user.id;
+        document.getElementById('welcomeMsg').textContent = `Welcome, ${user.username}`;
+      } catch {
+        window.location.href = 'login.html';
+      }
+    }
+
+    // ← UPDATED: hit /get_sales?companyId=…
+    async function loadSaleDishes() {
+      const tbody = document.querySelector('#dishesTable tbody');
+      try {
+        const list = await (await fetch(`${API}/get_sales?companyId=${companyId}`, { credentials: 'include' })).json();
+        tbody.innerHTML = list.map(d =>
+          `<tr><td>${d.dish_name}</td><td>${d.price.toFixed(2)}</td><td>${d.amount}</td></tr>`
+        ).join('');
+      } catch {
+        show('updMsg',"Couldn't load on‑sale dishes",'error');
+      }
+    }
+
+    // ← UPDATED: hit /get_dishes?companyId=…
+    async function loadAllCompanyDishes() {
+      try {
+        const list = await (await fetch(`${API}/get_dishes?companyId=${companyId}`, { credentials: 'include' })).json();
+        const select = document.getElementById('updName');
+        select.innerHTML = list.map(d =>
+          `<option value="${d.id}" data-sale="${d.sale}">${d.dish_name} (${d.sale ? 'On Sale' : 'Not On Sale'})</option>`
+        ).join('');
+
+        select.addEventListener('change', function() {
+          document.getElementById('updSale').checked =
+            this.options[this.selectedIndex].getAttribute('data-sale') === 'true';
+        });
+        if (select.options.length > 0) select.dispatchEvent(new Event('change'));
+      } catch {
+        show('updMsg',"Couldn't load dishes for update",'error');
+      }
+    }
+
+    async function refreshDishes() {
+      await loadSaleDishes();
+      await loadAllCompanyDishes();
+    }
+
+    document.getElementById('refreshBtn').addEventListener('click', refreshDishes);
+
+    document.getElementById('addDishForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const name = document.getElementById('newName').value;
+      const price = parseFloat(document.getElementById('newPrice').value);
+      const amount = parseInt(document.getElementById('newQuantity').value,10);
+      try {
+        const res = await fetch(`${API}/adddish`, {
+          method: 'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ dish_name:name, price, amount, sale:true, company_id: companyId })
+        });
+        if (res.ok) {
+          show('addMsg','Dish added');
+          refreshDishes();
+          e.target.reset();
+        } else {
+          const err = await res.json().catch(() => ({}));
+          show('addMsg', err.message || 'Add failed','error');
+        }
+      } catch {
+        show('addMsg','Add failed','error');
+      }
+    });
+
+    document.getElementById('updateDishForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const id = parseInt(document.getElementById('updName').value, 10);
+      const price = parseFloat(document.getElementById('updPrice').value);
+      const amount = parseInt(document.getElementById('updQuantity').value, 10);
+      const sale = document.getElementById('updSale').checked;
+      try {
+        const res = await fetch(`${API}/updateDish`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ id, price, amount, sale, company_id: companyId })
+        });
+        if (res.ok) {
+          show('updMsg','Dish updated successfully');
+          refreshDishes();
+        } else {
+          const err = await res.json().catch(() => ({}));
+          show('updMsg', err.message || 'Update failed','error');
+        }
+      } catch (err) {
+        show('updMsg','Update failed - ' + err.message,'error');
+      }
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      await fetch('http://localhost:5000/logout',{method:'POST', credentials:'include'});
+      window.location.href='login.html';
+    });
+
+    (async ()=> {
+      await loadSession();
+      await refreshDishes();
+    })();
+  </script>
+</body>
+</html>

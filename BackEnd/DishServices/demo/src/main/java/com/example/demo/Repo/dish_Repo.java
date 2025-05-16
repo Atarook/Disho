@@ -6,14 +6,15 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.example.demo.model.Dish;
 
 @Repository
 public interface dish_Repo extends JpaRepository<Dish, Integer> , JpaSpecificationExecutor<Dish> {
-    @Query("select d from Dish d where d.sale=true")
-    public List<Dish> getsalesdishes();
+    @Query("SELECT d FROM Dish d WHERE d.sale = true AND d.company_id = :companyId")
+  List<Dish> findSaleDishesByCompany(@Param("companyId") Long companyId);
     @Query("select d.amount from Dish d where d.dish_name=?1")
     public int getDishamount(String Name);
 
@@ -21,6 +22,8 @@ public interface dish_Repo extends JpaRepository<Dish, Integer> , JpaSpecificati
     public boolean existsByName(String Name);
 
     @Query("select d from Dish d where d.id = ?1")
-    public Optional<Dish> findByIdForUpdate(Long id);
+    public Optional<Dish> findByIdForUpdate(int id);
+   @Query("SELECT d FROM Dish d WHERE d.company_id = :companyId")
+  List<Dish> findAllByCompany(@Param("companyId") Long companyId);
 
 }

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seller Dashboard - Dishes Platform</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/seller.css">
+</head>
+<body>
+    <nav class="main-nav">
+        <div class="nav-left">
+            <div class="logo">Dishes Platform</div>
+        </div>
+        <div class="nav-right">
+            <button class="btn btn-primary" id="add-dish-btn">Add New Dish</button>
+            <button class="btn btn-secondary" id="account-btn">Account</button>
+            <button class="btn btn-secondary" id="logout-btn">Logout</button>
+        </div>
+    </nav>
+
+    <div class="main-container">
+        <div class="dashboard-grid">
+            <!-- Statistics Cards -->
+            <div class="stats-card">
+                <h3>Total Orders</h3>
+                <div class="stat-value" id="total-orders">0</div>
+            </div>
+            <div class="stats-card">
+                <h3>Total Revenue</h3>
+                <div class="stat-value" id="total-revenue">$0.00</div>
+            </div>
+            <div class="stats-card">
+                <h3>Active Dishes</h3>
+                <div class="stat-value" id="active-dishes">0</div>
+            </div>
+            <div class="stats-card">
+                <h3>Pending Orders</h3>
+                <div class="stat-value" id="pending-orders">0</div>
+            </div>
+
+            <!-- Dishes Section -->
+            <div class="section-card dishes-section">
+                <div class="section-header">
+                    <h2>My Dishes</h2>
+                    <div class="section-actions">
+                        <input type="text" id="dish-search" placeholder="Search dishes...">
+                        <select id="dish-category-filter">
+                            <option value="">All Categories</option>
+                            <option value="main">Main Course</option>
+                            <option value="appetizer">Appetizers</option>
+                            <option value="dessert">Desserts</option>
+                            <option value="beverage">Beverages</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="dishes-grid" id="dishes-container">
+                    <!-- Dishes will be dynamically loaded here -->
+                </div>
+            </div>
+
+            <!-- Orders Section -->
+            <div class="section-card orders-section">
+                <div class="section-header">
+                    <h2>Recent Orders</h2>
+                    <div class="section-actions">
+                        <select id="order-status-filter">
+                            <option value="">All Status</option>
+                            <option value="pending">Pending</option>
+                            <option value="processing">Processing</option>
+                            <option value="completed">Completed</option>
+                            <option value="cancelled">Cancelled</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="orders-list" id="orders-container">
+                    <!-- Orders will be dynamically loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dish Modal -->
+    <div id="dish-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="dish-modal-title">Add New Dish</h2>
+                <button class="close-btn" onclick="closeModal('dish-modal')">&times;</button>
+            </div>
+            <form id="dish-form">
+                <div class="form-group">
+                    <label for="dish-name">Name</label>
+                    <input type="text" id="dish-name" required>
+                </div>
+                <div class="form-group">
+                    <label for="dish-description">Description</label>
+                    <textarea id="dish-description" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="dish-category">Category</label>
+                    <select id="dish-category" required>
+                        <option value="main">Main Course</option>
+                        <option value="appetizer">Appetizers</option>
+                        <option value="dessert">Desserts</option>
+                        <option value="beverage">Beverages</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="dish-price">Price ($)</label>
+                    <input type="number" id="dish-price" step="0.01" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label for="dish-quantity">Available Quantity</label>
+                    <input type="number" id="dish-quantity" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label for="dish-image">Image URL</label>
+                    <input type="url" id="dish-image" placeholder="https://example.com/image.jpg">
+                </div>
+                <button type="submit" class="btn btn-primary">Save Dish</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Account Modal -->
+    <div id="account-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Account Settings</h2>
+                <button class="close-btn" onclick="closeModal('account-modal')">&times;</button>
+            </div>
+            <form id="account-form">
+                <div class="form-group">
+                    <label for="account-company">Company Name</label>
+                    <input type="text" id="account-company" required>
+                </div>
+                <div class="form-group">
+                    <label for="account-email">Email</label>
+                    <input type="email" id="account-email" required>
+                </div>
+                <div class="form-group">
+                    <label for="account-phone">Phone Number</label>
+                    <input type="tel" id="account-phone" required>
+                </div>
+                <div class="form-group">
+                    <label for="account-description">Company Description</label>
+                    <textarea id="account-description" required></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/seller.js"></script>
+    <script>
+        // Initialize the seller interface
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check if user is logged in and is a seller
+            if (!auth.isAuthenticated() || auth.getUserType() !== 'seller') {
+                window.location.href = 'index.html';
+                return;
+            }
+
+            // Initialize seller interface
+            seller.init();
+
+            // Bind event listeners
+            document.getElementById('add-dish-btn').addEventListener('click', () => {
+                document.getElementById('dish-modal-title').textContent = 'Add New Dish';
+                document.getElementById('dish-form').reset();
+                document.getElementById('dish-modal').style.display = 'block';
+            });
+
+            document.getElementById('account-btn').addEventListener('click', () => {
+                document.getElementById('account-modal').style.display = 'block';
+                seller.loadAccountInfo();
+            });
+
+            document.getElementById('logout-btn').addEventListener('click', () => {
+                auth.logout();
+                window.location.href = 'index.html';
+            });
+
+            document.getElementById('dish-search').addEventListener('input', (e) => {
+                seller.filterDishes(e.target.value);
+            });
+
+            document.getElementById('dish-category-filter').addEventListener('change', (e) => {
+                seller.filterDishesByCategory(e.target.value);
+            });
+
+            document.getElementById('order-status-filter').addEventListener('change', (e) => {
+                seller.filterOrdersByStatus(e.target.value);
+            });
+
+            document.getElementById('dish-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await seller.saveDish();
+            });
+
+            document.getElementById('account-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await seller.updateAccountInfo();
+            });
+        });
+
+        // Close modal function
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        };
+    </script>
+</body>
+</html> 

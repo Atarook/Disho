@@ -1,6 +1,8 @@
 package com.example.demo.service;
 
+import java.nio.file.AccessDeniedException;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.messaging.handler.annotation.Payload;
@@ -13,6 +15,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.ConnectionFactory;
 
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 
 import com.rabbitmq.client.Connection;
@@ -195,12 +198,36 @@ public class dish_services {
     // })
     // .orElse("FAIL:NoSuchDish");
 
-    public void UpdateDish(Dish dish) {
-        dishRepo.save(dish);
+@Transactional
+public void UpdateDish(Dish incoming) throws AccessDeniedException {
+    // 1) Load (and lock) the existing dish
+    Dish existing = dishRepo.findByIdForUpdate(incoming.getId())
+        .orElseThrow(() -> new EntityNotFoundException(
+            "Dish not found with id " + incoming.getId())
+        );
+
+    // 2) Security check: verify the dish belongs to the company attempting to update it
+    if (!existing.getCompany_id().equals(incoming.getCompany_id())) {
+        throw new AccessDeniedException("You can only update dishes that belong to your company");
     }
 
-    public List<Dish> listAllSaleDishs() {
-        return dishRepo.getsalesdishes();
-    }
+    // 3) Mutate only the fields that should change
+    // Note: We're not updating dish_name from the incoming request since it's not in the form
+    // existing.setDish_name(incoming.getDish_name());
+    existing.setPrice(incoming.getPrice());
+    existing.setAmount(incoming.getAmount());
+    existing.setSale(incoming.isSale());
+
+    // 4) No explicit save() needed — JPA will flush the dirty fields at commit.
+}
+
+
+     public List<Dish> listSaleDishes(Long companyId) {
+    return dishRepo.findSaleDishesByCompany(companyId);
+  }
+
+  public List<Dish> listAllDishes(Long companyId) {
+    return dishRepo.findAllByCompany(companyId);
+  }
 
 }

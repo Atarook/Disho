@@ -4,45 +4,57 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin Dashboard - CMS</title>
-  <link rel="stylesheet" href="styles.css">
+  <title>Dishes Platform - Admin Dashboard</title>
+  <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-  <div class="container">
-    <h1>Admin Dashboard</h1>
-    <p id="welcomeMsg" style="text-align:center; font-weight:500; color:#34495e;"></p>
+  <nav class="main-nav">
+    <div class="nav-left">
+      <div class="logo">Dishes Platform</div>
+    </div>
+    <div class="nav-right">
+      <button class="btn btn-secondary" id="logoutBtn">Logout</button>
+    </div>
+  </nav>
 
-    <div class="section">
-      <h2>All Customers</h2>
-      <ul id="customerList"></ul>
+  <div class="main-container">
+    <div class="welcome-section">
+      <h1>Admin Dashboard</h1>
+      <p id="welcomeMsg" style="text-align:center; font-weight:500; color:#34495e;"></p>
     </div>
-    <div class="section">
-      <h2>All Companies</h2>
-      <ul id="companyList"></ul>
+
+    <div class="features">
+      <div class="feature-card">
+        <h2>All Customers</h2>
+        <ul id="customerList"></ul>
+      </div>
+      <div class="feature-card">
+        <h2>All Companies</h2>
+        <ul id="companyList"></ul>
+      </div>
+      <div class="feature-card">
+        <h2>Create Company</h2>
+        <form id="companyForm">
+          <div class="form-group">
+            <label for="newCompanyUsername">Username</label>
+            <input type="text" id="newCompanyUsername" required>
+          </div>
+          <div class="form-group">
+            <label for="newCompanyLocation">Location</label>
+            <input type="text" id="newCompanyLocation" required>
+          </div>
+          <button type="submit" class="btn btn-primary">Create</button>
+        </form>
+        <div id="companyMessage" class="message" style="display:none;"></div>
+      </div>
     </div>
-    <div class="section">
-      <h2>Create Company</h2>
-      <form id="companyForm">
-        <div class="form-group">
-          <label for="newCompanyUsername">Username</label>
-          <input type="text" id="newCompanyUsername" required>
-        </div>
-        <div class="form-group">
-          <label for="newCompanyLocation">Location</label>
-          <input type="text" id="newCompanyLocation" required>
-        </div>
-        <button type="submit">Create</button>
-      </form>
-      <div id="companyMessage" class="message" style="display:none;"></div>
-    </div>
-    <button id="logoutBtn">Logout</button>
   </div>
 
   <script>
     const API = 'http://localhost:5000';
 
     document.addEventListener('DOMContentLoaded', async () => {
-      const container = document.querySelector('.container');
+      const container = document.querySelector('.main-container');
 
       try {
         const res = await fetch(`${API}/me`, { credentials: 'include' });
@@ -51,10 +63,12 @@
 
         if (user.role !== 'Admin') {
           container.innerHTML = `
-            <h1>Unauthorized</h1>
-            <p style="color:red; text-align:center;">You are not authorized to view this page.</p>
-            <div style="text-align:center; margin-top:20px;">
-              <button onclick="window.location.href='login.html'">Go to Login</button>
+            <div class="welcome-section">
+              <h1>Unauthorized</h1>
+              <p style="color:red; text-align:center;">You are not authorized to view this page.</p>
+              <div style="text-align:center; margin-top:20px;">
+                <button class="btn btn-primary" onclick="window.location.href='Login.html'">Go to Login</button>
+              </div>
             </div>
           `;
           return;
@@ -108,15 +122,17 @@
         // Logout
         document.getElementById('logoutBtn').addEventListener('click', async () => {
           await fetch(`${API}/logout`, { method: 'POST', credentials: 'include' });
-          window.location.href = 'login.html';
+          window.location.href = 'Login.html';
         });
 
       } catch (error) {
         container.innerHTML = `
-          <h1>Unauthorized</h1>
-          <p style="color:red; text-align:center;">You are not logged in or lack permission to view this page.</p>
-          <div style="text-align:center; margin-top:20px;">
-            <button onclick="window.location.href='login.html'">Go to Login</button>
+          <div class="welcome-section">
+            <h1>Unauthorized</h1>
+            <p style="color:red; text-align:center;">You are not logged in or lack permission to view this page.</p>
+            <div style="text-align:center; margin-top:20px;">
+              <button class="btn btn-primary" onclick="window.location.href='Login.html'">Go to Login</button>
+            </div>
           </div>
         `;
       }

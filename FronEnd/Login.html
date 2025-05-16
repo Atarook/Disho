@@ -4,109 +4,61 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Login - Customer Management System</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f8f9fa;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-    }
-    .container {
-      background-color: white;
-      border-radius: 8px;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-      padding: 30px;
-      width: 100%;
-      max-width: 400px;
-    }
-    h1 {
-      color: #2c3e50;
-      text-align: center;
-      margin-bottom: 30px;
-    }
-    .form-group {
-      margin-bottom: 20px;
-    }
-    label {
-      display: block;
-      margin-bottom: 8px;
-      font-weight: 500;
-      color: #34495e;
-    }
-    input {
-      width: 100%;
-      padding: 12px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      box-sizing: border-box;
-      font-size: 16px;
-    }
-    button {
-      background-color: #3498db;
-      color: white;
-      border: none;
-      padding: 12px 0;
-      width: 100%;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 16px;
-      font-weight: 600;
-      transition: background-color 0.3s;
-    }
-    button:hover {
-      background-color: #2980b9;
-    }
-    .message {
-      text-align: center;
-      padding: 10px;
-      margin-bottom: 20px;
-      border-radius: 4px;
-    }
-    .error {
-      background-color: #ffdddd;
-      color: #ff0000;
-    }
-    .success {
-      background-color: #ddffdd;
-      color: #00aa00;
-    }
-    .alt-action {
-      text-align: center;
-      margin-top: 20px;
-      color: #7f8c8d;
-    }
-    .alt-action a {
-      color: #3498db;
-      text-decoration: none;
-      font-weight: 500;
-    }
-    .alt-action a:hover {
-      text-decoration: underline;
-    }
-  </style>
+  <title>Dishes Platform - Login</title>
+  <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-  <div class="container">
-    <h1>Login</h1>
-    <div id="message" class="message" style="display: none;"></div>
-    <form id="loginForm">
-      <div class="form-group">
-        <label for="username">Username</label>
-        <input type="text" id="username" name="username" required />
+  <nav class="main-nav">
+    <div class="nav-left">
+      <div class="logo">Dishes Platform</div>
+    </div>
+    <div class="nav-right">
+      <button class="btn btn-primary" id="login-btn">Login</button>
+      <button class="btn btn-secondary" id="register-btn">Register</button>
+    </div>
+  </nav>
+
+  <div class="main-container">
+    <div class="welcome-section">
+      <h1>Welcome to Dishes Platform</h1>
+      <p>Your favorite food delivery platform</p>
+      <div class="features">
+        <div class="feature-card">
+          <h3>For Customers</h3>
+          <p>Browse and order from a variety of dishes</p>
+        </div>
+        <div class="feature-card">
+          <h3>For Sellers</h3>
+          <p>Manage your dishes and orders</p>
+        </div>
+        <div class="feature-card">
+          <h3>Fast Delivery</h3>
+          <p>Quick and reliable delivery service</p>
+        </div>
       </div>
-      <div class="form-group">
-        <label for="password">Password</label>
-        <input type="password" id="password" name="password" required />
+    </div>
+  </div>
+
+  <!-- Login Modal -->
+  <div id="login-modal" class="modal">
+    <div class="modal-content">
+      <h2>Login</h2>
+      <div id="message" class="message" style="display: none;"></div>
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input type="text" id="username" name="username" required />
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" required />
+        </div>
+        <button type="submit" class="btn btn-primary">Login</button>
+        <!-- <button type="button" class="btn btn-secondary" onclick="closeModal('login-modal')">Cancel</button> -->
+      </form>
+      <div class="alt-action">
+        Don't have an account? <a href="Register.html">Register</a>
       </div>
-      <button type="submit">Login</button>
-    </form>
-    <div class="alt-action">
-      Don't have an account? <a href="register.html">Register</a>
     </div>
   </div>
 
@@ -119,13 +71,19 @@
         window.location.href = 'admin_dashboard.html';
       } else if (role === 'Customer') {
         window.location.href = 'customer_dashboard.html';
+      } 
+      else if (role === 'Company') {
+        window.location.href = 'company_dashboard.html'; 
       } else {
-        window.location.href = 'login.html';
+        window.location.href = 'Login.html';
       }
     }
 
     // On page load, check session and redirect if valid
     window.addEventListener('DOMContentLoaded', async () => {
+      // Show login modal immediately
+      document.getElementById('login-modal').style.display = 'block';
+
       try {
         const resp = await fetch(`${API}/me`, { credentials: 'include' });
         if (resp.ok) {
@@ -176,6 +134,18 @@
         msgDiv.style.display = 'none';
       }, 5000);
     }
+
+    // Close modal function
+    function closeModal(modalId) {
+      document.getElementById(modalId).style.display = 'none';
+    }
+
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+      if (event.target.classList.contains('modal')) {
+        event.target.style.display = 'none';
+      }
+    };
   </script>
 </body>
 </html>

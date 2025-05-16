@@ -6,8 +6,10 @@ import org.springframework.web.bind.annotation.RestController;
 import com.example.demo.model.Dish;
 import com.example.demo.service.dish_services;
 
+import java.nio.file.AccessDeniedException;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -16,7 +18,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 
-
+@CrossOrigin(origins = "http://localhost:8000", allowCredentials = "true")
 @RestController
 @RequestMapping("/dish")
 public class Dish_controller {
@@ -37,14 +39,25 @@ public class Dish_controller {
     }
 @PostMapping(value = "/updateDish", consumes = "application/json")
     public String UpdateDish(@RequestBody Dish entity) {
-        dishes.UpdateDish(entity);
+        try {
+            dishes.UpdateDish(entity);
+        } catch (AccessDeniedException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
         return "Dish updated successfully";
     }
     
-    @GetMapping("/getallsales")
-    public List<Dish> getsalesdishes() {
-        return dishes.listAllSaleDishs();
-    }
+    @GetMapping("/get_sales")
+  public List<Dish> getSaleDishes(@RequestParam("companyId") Long companyId) {
+    return dishes.listSaleDishes(companyId);
+  }
+
+  @GetMapping("get_dishes")
+  public List<Dish> getAllDishes(@RequestParam("companyId") Long companyId) {
+    return dishes.listAllDishes(companyId);
+  }
+    
     @GetMapping("/test")
     public String getdish() {
         return "test";
