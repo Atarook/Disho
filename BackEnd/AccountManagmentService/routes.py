@@ -2,19 +2,16 @@ import json
 import pika
 from flask import Blueprint, request, jsonify, session
 from flask_sqlalchemy import SQLAlchemy
+import secrets
 
 from database import db
 from Models import Account
-
-# —————————————————————————————————————————————————————————————
-# HTTP Blueprint
-# —————————————————————————————————————————————————————————————
 routes = Blueprint("routes", __name__)
 
 @routes.route('/register', methods=["POST"])
 def register():
     data = request.get_json() or {}
-    for field in ("username", "password", "balance"):
+    for field in ("username", "password", "balance","location"):
         if field not in data:
             return jsonify({"error": f"Missing field: {field}"}), 400
 
@@ -25,18 +22,17 @@ def register():
         username=data["username"],
         password=data["password"],
         balance=data["balance"],
-        role="Customer"
+        role="Customer",
+        location=data["location"]
     )
     db.session.add(user)
     db.session.commit()
     session["username"]   = user.username
+    session["id"]=user.id
     session["user_role"]  = user.role
     return jsonify({"message": f"Registered {user.username}"}), 201
 
-@routes.route('/list_all', methods=["GET"])
-def list_all_accounts():
-    accounts = Account.query.all()
-    return jsonify([account.to_json() for account in accounts]), 200
+
 
 @routes.route('/login', methods=["POST"])
 def login():
@@ -50,14 +46,112 @@ def login():
         return jsonify({"error": "Invalid credentials"}), 401
 
     session["username"]  = user.username
+    session["id"]=user.id
     session["user_role"] = user.role
     return jsonify({"message": "Login successful"}), 200
 
-# (other admin/company endpoints omitted for brevity…)
 
-# —————————————————————————————————————————————————————————————
-# RabbitMQ RPC Server for Customer Balance Check
-# —————————————————————————————————————————————————————————————
+@routes.route('/logout', methods=['POST'])
+def logout():
+    session.clear()
+    return jsonify({"message": "Logged out successfully"}), 200
+
+
+@routes.route('/me', methods=['GET'])
+def me():
+    user_id = session.get("id")
+    if not user_id:
+        return jsonify({"error": "Not authenticated"}), 401
+
+    user = Account.query.get(user_id)
+    if not user:
+        session.clear()
+        return jsonify({"error": "User no longer exists"}), 401
+
+    return jsonify({
+        "id": user.id,
+        "username": user.username,
+        "role": user.role
+    }), 200
+    
+    
+@routes.route('/list_all', methods=["GET"])
+def list_all_accounts():
+    accounts = Account.query.all()
+    return jsonify([account.to_json() for account in accounts]), 200
+
+
+@routes.route('/list_all_customer', methods=["GET"])
+def list_all_customers():
+    id=session.get("id")
+    if not id:
+        return jsonify({"error": "Not logged in"}), 401
+    user = Account.query.filter_by(id=id).first()
+    if user.role !='Admin':
+        return jsonify({"error": "Not an admin"}), 403
+    accounts = Account.query.filter_by(role="Customer").all()
+    return jsonify([account.to_json() for account in accounts]), 200
+
+
+@routes.route('/list_all_companies', methods=["GET"])
+def list_all_companies():
+    id=session.get("id")
+    if not id:
+        return jsonify({"error": "Not logged in"}), 401
+    user = Account.query.filter_by(id=id).first()
+    if user.role !='Admin':
+        return jsonify({"error": "Not an admin"}), 403
+    accounts = Account.query.filter_by(role="Company").all()
+    return jsonify([account.to_json() for account in accounts]), 200
+
+
+@routes.route('/create_company',methods=["POST"])
+def create_company():
+    data = request.get_json() or {}
+    for field in ("username","location"):
+        if field not in data:
+            return jsonify({"error": f"Missing field: {field}"}), 400
+    id=session.get("id")
+    if not id:
+        return jsonify({"error": "Not logged in"}), 401
+    user = Account.query.filter_by(id=id).first()
+    if user.role !='Admin':
+        return jsonify({"error": "Not an admin"}), 403
+    Company = Account.query.filter_by(username=data["username"]).first()
+    if Company:
+        return jsonify({"error": "There is a company with the same username "}), 401
+    Company = Account(
+        username=data["username"],
+        password=secrets.token_urlsafe(8),
+        location=data["location"],
+        role="Company"
+    )
+    db.session.add(Company)
+    db.session.commit()
+    return jsonify({"message": "Company created successfully",
+    "username": Company.username,
+    "password": Company.password}), 200
+    
+    
+
+@routes.route('/get_location',methods=["GET"])
+def location():
+    id=session.get("id")
+    if not id:
+        return jsonify({"error": "Not logged in"}), 401
+    user = Account.query.filter_by(id=id).first()
+    location=user.location
+    shipping = Account.query.filter_by(location=location,role="shipping").first()
+    if not shipping:
+        return jsonify({"error": "No shipping company in your area"}), 404
+    return jsonify({
+        "id":       shipping.id,
+        "username": shipping.username,
+        "location": shipping.location,
+        "balance":  shipping.balance
+    }),200
+        
+           
 RABBITMQ_PARAMS = pika.ConnectionParameters(
     host="localhost",
     port=5672,

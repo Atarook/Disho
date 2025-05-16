@@ -1,0 +1,143 @@
+<!-- admin_dashboard.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - CMS</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Admin Dashboard</h1>
+    <p id="welcomeMsg" style="text-align:center; font-weight:500; color:#34495e;"></p>
+
+    <div class="section">
+      <h2>All Customers</h2>
+      <ul id="customerList"></ul>
+    </div>
+    <div class="section">
+      <h2>All Companies</h2>
+      <ul id="companyList"></ul>
+    </div>
+    <div class="section">
+      <h2>Create Company</h2>
+      <form id="companyForm">
+        <div class="form-group">
+          <label for="newCompanyUsername">Username</label>
+          <input type="text" id="newCompanyUsername" required>
+        </div>
+        <div class="form-group">
+          <label for="newCompanyLocation">Location</label>
+          <input type="text" id="newCompanyLocation" required>
+        </div>
+        <button type="submit">Create</button>
+      </form>
+      <div id="companyMessage" class="message" style="display:none;"></div>
+    </div>
+    <button id="logoutBtn">Logout</button>
+  </div>
+
+  <script>
+    const API = 'http://localhost:5000';
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      const container = document.querySelector('.container');
+
+      try {
+        const res = await fetch(`${API}/me`, { credentials: 'include' });
+        if (!res.ok) throw new Error('Not authenticated');
+        const user = await res.json();
+
+        if (user.role !== 'Admin') {
+          container.innerHTML = `
+            <h1>Unauthorized</h1>
+            <p style="color:red; text-align:center;">You are not authorized to view this page.</p>
+            <div style="text-align:center; margin-top:20px;">
+              <button onclick="window.location.href='login.html'">Go to Login</button>
+            </div>
+          `;
+          return;
+        }
+
+        document.getElementById('welcomeMsg').textContent = `Welcome, ${user.username}`;
+
+        // Load all customers
+        fetch(`${API}/list_all_customer`, { credentials: 'include' })
+          .then(res => res.json())
+          .then(data => {
+            document.getElementById('customerList').innerHTML =
+              data.map(c => `<li>${c.username} (Balance: ${c.balance})</li>`).join('');
+          });
+
+        // Load all companies
+        fetch(`${API}/list_all_companies`, { credentials: 'include' })
+          .then(res => res.json())
+          .then(data => {
+            document.getElementById('companyList').innerHTML =
+              data.map(c => `<li>${c.username} (Location: ${c.location})</li>`).join('');
+          });
+
+        // Handle company creation
+        document.getElementById('companyForm').addEventListener('submit', async e => {
+          e.preventDefault();
+          const username = document.getElementById('newCompanyUsername').value;
+          const location = document.getElementById('newCompanyLocation').value;
+          const res = await fetch(`${API}/create_company`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ username, location })
+          });
+          const data = await res.json();
+          const msg = document.getElementById('companyMessage');
+          if (res.ok) {
+            msg.textContent = `Created ${data.username}, password: ${data.password}`;
+            msg.className = 'message success';
+          } else {
+            if (data.error.includes('same username')) {
+              msg.textContent = '⚠️ A company with this username already exists. Please choose a different one.';
+            } else {
+              msg.textContent = data.error;
+            }
+            msg.className = 'message error';
+          }
+          msg.style.display = 'block';
+        });
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+          await fetch(`${API}/logout`, { method: 'POST', credentials: 'include' });
+          window.location.href = 'login.html';
+        });
+
+      } catch (error) {
+        container.innerHTML = `
+          <h1>Unauthorized</h1>
+          <p style="color:red; text-align:center;">You are not logged in or lack permission to view this page.</p>
+          <div style="text-align:center; margin-top:20px;">
+            <button onclick="window.location.href='login.html'">Go to Login</button>
+          </div>
+        `;
+      }
+    });
+  </script>
+
+  <!-- styles.css -->
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8f9fa; margin: 0; padding: 0; }
+    .container { max-width: 800px; margin: 40px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+    h1 { text-align: center; color: #2c3e50; }
+    .section { margin-bottom: 30px; }
+    .form-group { margin-bottom: 15px; }
+    input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius:4px; }
+    button { background: #3498db; color: white; padding: 10px 20px; border:none; border-radius:4px; cursor:pointer; }
+    button:hover { background: #2980b9; }
+    .message { padding:10px; border-radius:4px; margin-top:10px; }
+    .message.success { background: #ddffdd; color:#00aa00; }
+    .message.error { background: #ffdddd; color:#ff0000; }
+    ul { list-style:none; padding:0; }
+    li { padding:5px 0; }
+  </style>
+</body>
+</html>

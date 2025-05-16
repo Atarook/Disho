@@ -1,0 +1,74 @@
+<!-- customer_dashboard.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Customer Dashboard</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f0f2f5;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .container {
+      background-color: white;
+      padding: 40px;
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      text-align: center;
+      width: 300px;
+    }
+    h1 {
+      margin-bottom: 30px;
+      color: #34495e;
+    }
+    button {
+      background-color: #e74c3c;
+      border: none;
+      color: white;
+      padding: 12px 20px;
+      font-size: 16px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+      font-weight: 600;
+    }
+    button:hover {
+      background-color: #c0392b;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Customer Dashboard</h1>
+    <button id="logoutBtn">Logout</button>
+  </div>
+
+  <script>
+    const API = 'http://localhost:5000';
+
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      try {
+        const resp = await fetch(`${API}/logout`, {
+          method: 'POST',
+          credentials: 'include'
+        });
+        if (resp.ok) {
+          window.location.href = 'login.html';
+        } else {
+          alert('Logout failed. Please try again.');
+        }
+      } catch (error) {
+        console.error('Logout error:', error);
+        alert('An error occurred while logging out.');
+      }
+    });
+  </script>
+</body>
+</html>

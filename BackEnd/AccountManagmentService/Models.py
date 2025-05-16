@@ -5,15 +5,16 @@ class Account(db.Model):
     username=db.Column(db.String(50),unique=True,nullable=False)
     password=db.Column(db.String(100),nullable=False)
     balance=db.Column(db.Float,nullable=True,default=0)
-    role=db.Column(db.Enum('Admin','Customer','Company',name='role_enum'),nullable=False)
-    
+    location=db.Column(db.String(100),nullable=False,default="None")
+    role=db.Column(db.Enum('Admin','Customer','Company','Shipping',name='role_enum'),nullable=False)
     def to_json(self):
         return{
             "id":self.id,
             "username":self.username,
             "password":self.password,
             "balance":self.balance,
-            "role":self.role
+            "role":self.role,
+            "location":self.location
         }
     
 

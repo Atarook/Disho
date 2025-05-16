@@ -1,0 +1,181 @@
+<!-- login.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Login - Customer Management System</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f8f9fa;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .container {
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      padding: 30px;
+      width: 100%;
+      max-width: 400px;
+    }
+    h1 {
+      color: #2c3e50;
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: #34495e;
+    }
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-size: 16px;
+    }
+    button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      padding: 12px 0;
+      width: 100%;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 600;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background-color: #2980b9;
+    }
+    .message {
+      text-align: center;
+      padding: 10px;
+      margin-bottom: 20px;
+      border-radius: 4px;
+    }
+    .error {
+      background-color: #ffdddd;
+      color: #ff0000;
+    }
+    .success {
+      background-color: #ddffdd;
+      color: #00aa00;
+    }
+    .alt-action {
+      text-align: center;
+      margin-top: 20px;
+      color: #7f8c8d;
+    }
+    .alt-action a {
+      color: #3498db;
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .alt-action a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Login</h1>
+    <div id="message" class="message" style="display: none;"></div>
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" required />
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required />
+      </div>
+      <button type="submit">Login</button>
+    </form>
+    <div class="alt-action">
+      Don't have an account? <a href="register.html">Register</a>
+    </div>
+  </div>
+
+  <script>
+    const API = 'http://localhost:5000';
+
+    // Redirect user based on role
+    function redirectByRole(role) {
+      if (role === 'Admin') {
+        window.location.href = 'admin_dashboard.html';
+      } else if (role === 'Customer') {
+        window.location.href = 'customer_dashboard.html';
+      } else {
+        window.location.href = 'login.html';
+      }
+    }
+
+    // On page load, check session and redirect if valid
+    window.addEventListener('DOMContentLoaded', async () => {
+      try {
+        const resp = await fetch(`${API}/me`, { credentials: 'include' });
+        if (resp.ok) {
+          const me = await resp.json();
+          redirectByRole(me.role);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    });
+
+    // Handle login form submission
+    document.getElementById('loginForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+
+      try {
+        const response = await fetch(`${API}/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ username, password }),
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+          // After successful login, fetch user info to get role
+          const meRes = await fetch(`${API}/me`, { credentials: 'include' });
+          const me = await meRes.json();
+          redirectByRole(me.role);
+        } else {
+          showMessage(data.error || 'Login failed. Please try again.', 'error');
+        }
+      } catch (error) {
+        console.error(error);
+        showMessage('An error occurred. Please try again later.', 'error');
+      }
+    });
+
+    // Show message helper
+    function showMessage(text, type) {
+      const msgDiv = document.getElementById('message');
+      msgDiv.textContent = text;
+      msgDiv.className = `message ${type}`;
+      msgDiv.style.display = 'block';
+      setTimeout(() => {
+        msgDiv.style.display = 'none';
+      }, 5000);
+    }
+  </script>
+</body>
+</html>

@@ -9,18 +9,15 @@ from database import db
 from Models import Account
 import routes  # our Blueprint + RPC server code
 
-# —————————————————————————————————————————————————————————————
-# Load environment
-# —————————————————————————————————————————————————————————————
+
 load_dotenv()
 DATABASE_URL = os.environ.get("DATABASE_URL")
 SECRET_KEY   = os.environ.get("SECRET_KEY")
 
-# —————————————————————————————————————————————————————————————
-# Flask setup
-# —————————————————————————————————————————————————————————————
 app = Flask(__name__)
-CORS(app)
+CORS(app,
+     supports_credentials=True,
+     resources={r"/*": {"origins": "http://localhost:8000"}})
 
 app.config["SQLALCHEMY_DATABASE_URI"]        = DATABASE_URL
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -35,15 +32,15 @@ app.register_blueprint(routes.routes)
 # Create tables & default admin
 with app.app_context():
     db.create_all()
-    # if not Account.query.filter_by(username="Admin").first():
-        # admin = Account(
-        #     username="Admin",
-        #     password="Admin123",
-        #     role="Admin",
-        #     balance=999999999
-        # )
-        # db.session.add(admin)
-        # db.session.commit()
+    if not Account.query.filter_by(username="Admin").first():
+        admin = Account(
+            username="Admin",
+            password="Admin123",
+            role="Admin",
+            balance=999999999
+        )
+        db.session.add(admin)
+        db.session.commit()
     
 
 if __name__ == "__main__":
