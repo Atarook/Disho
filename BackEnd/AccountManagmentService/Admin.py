@@ -1,7 +1,12 @@
 import pika
-
+array_logs=[]
 def admin_notify_callback(ch, method, properties, body):
-    print("ADMIN ALERT:", body.decode())
+    msg = body.decode()
+    array_logs.append(msg)    
+    print("ADMIN ALERT:", msg)
+    
+# if(array_logs!=[]):
+#     print(f"Missing field: {array_logs[0]}")
 def wait(app):
     connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
     channel = connection.channel()

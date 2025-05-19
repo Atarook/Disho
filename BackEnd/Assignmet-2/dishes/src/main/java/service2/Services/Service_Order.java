@@ -86,19 +86,23 @@ public class Service_Order {
         }
     }
 
-    private void logEvent(String serviceName, String severity, String message) throws IOException {
-        String routingKey =  severity;
-        ObjectNode logMsg = mapper.createObjectNode();
-        logMsg.put("service", serviceName);
-        logMsg.put("severity", severity);
-        logMsg.put("message", message);
-        logMsg.put("timestamp", Instant.now().toString());
-        channel.basicPublish(
-                LOG_EXCHANGE,
-                routingKey,
-                null,
-                mapper.writeValueAsBytes(logMsg));
-    }
+
+
+private void logEvent(String serviceName, String severity, String message) throws IOException {
+    
+    String routingKey = severity;
+    ObjectNode logMsg = mapper.createObjectNode();
+    logMsg.put("service", serviceName);
+    logMsg.put("severity", severity);
+    logMsg.put("message", message);
+    logMsg.put("timestamp", Instant.now().toString());
+    channel.basicPublish(
+        LOG_EXCHANGE,
+        routingKey,
+        null,
+        mapper.writeValueAsBytes(logMsg)
+    );
+}
 
     public void convert(String name, Double price, int id, int quan) {
         OrderItem orderItem = new OrderItem();
@@ -151,7 +155,7 @@ public class Service_Order {
 
     public List<Order> getorder(long custid) throws SQLException {
         try {
-            logEvent("Order", "Info", "Fetching orders for customer: " + custid);
+            logEvent("Order", "info", "Fetching orders for customer: " + custid);
         } catch (IOException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
@@ -161,7 +165,7 @@ public class Service_Order {
 
     public String getRequestById(long id) {
         try {
-            logEvent("Order", "Info", "Fetching request by ID: " + id);
+            logEvent("Order", "*_info", "Fetching request by ID: " + id);
         } catch (IOException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();

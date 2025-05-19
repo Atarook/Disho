@@ -300,17 +300,18 @@ private void notifyAdminPaymentFailed2(long customerId, float cost) throws IOExc
             // Step 1: Verify customer balance
             if (!checkCustomerBalance(customerId, cost)) {
                 try {
-                    logEvent("Order", "*_Error", "Insufficient funds for customer: " + customerId);
+                    logEvent("Order", "*_Error", "Insufficient funds for customer: " + customerId + " and order is canceled");
                     notifyAdminPaymentFailed(customerId, cost);
+                    order.setOrderStatus("Rejected");
                 } catch (Exception e) {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
                 }
 
-                System.out.println("Insufficient funds for customer: " + customerId);
+                System.out.println("Insufficient funds for customer: " + customerId+ " and order is canceled");
                 orderDAL.deleteOrder(order.getId());
                 result.put("status", "failed");
-                result.put("message", "Insufficient funds for customer");
+                result.put("message", "Insufficient funds for customer and order is canceled");
                 result.put("orderStatus", "Rejected");
                 return result;
             }
@@ -318,7 +319,7 @@ private void notifyAdminPaymentFailed2(long customerId, float cost) throws IOExc
             // Step 2: Verify dish stock
             if (checkDishStock(cartItems)) {
                 try {
-                    logEvent("Order", "Error", "Insufficient stock for order items");
+                    logEvent("Order", "*_Error", "Insufficient stock for order items"+" and order is canceled");
                 } catch (Exception e) {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
@@ -329,10 +330,10 @@ private void notifyAdminPaymentFailed2(long customerId, float cost) throws IOExc
                 commitCust.put("deductCost", "false");
                 commitCust.put("timestamp", Instant.now().toString());
                 channel.basicPublish(EXCHANGE, "customer", null, mapper.writeValueAsBytes(commitCust));
-                System.out.println("Insufficient stock for order items");
+                System.out.println("Insufficient stock for order items and order is canceled");
                 orderDAL.deleteOrder(order.getId());
                 result.put("status", "failed");
-                result.put("message", "Insufficient stock for order items");
+                result.put("message", "Insufficient stock for order items and order is canceled");
                 result.put("orderStatus", "Rejected");
                 return result;
             }

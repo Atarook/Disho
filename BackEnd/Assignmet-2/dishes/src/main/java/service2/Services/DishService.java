@@ -1,46 +1,55 @@
-// package service2.Services;
+// package service2.DAL;
+// import java.io.*;
+// import java.net.*;
 
-// import java.sql.Connection;
-// import java.sql.SQLException;
-// import java.util.List;
+// public class MultiThreadedEchoServer {
+//     private static final int PORT = 12345;
 
-// import jakarta.ejb.Stateless;
-// import service2.DAL.DatabaseConnection;
-// import service2.DAL.DishDAL;
-// import service2.Model.Dish;
-
-// @Stateless
-// public class DishService {
-
-//     private DishDAL dishDAL;
-
-//     public DishService() throws SQLException {
-//         // You can replace with JNDI lookup or DataSource later
-//         Connection conn = DatabaseConnection.getConnection();
-//         this.dishDAL = new DishDAL(conn);
+//     public static void main(String[] args) {
+//         System.out.println("Echo server starting on port " + PORT);
+//         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
+//             while (true) {
+//                 // Wait for a client connection
+//                 Socket clientSocket = serverSocket.accept();
+//                 System.out.println("Client connected from " + 
+//                                    clientSocket.getRemoteSocketAddress());
+//                 // Handle the client in a new thread
+//                 new Thread(new ClientHandler(clientSocket)).start();
+//             }
+//         } catch (IOException e) {
+//             e.printStackTrace();
+//         }
 //     }
 
-//     public void addDish(Dish dish) throws SQLException {
-//         dishDAL.addDish(dish);
-//     }
+//     // Inner class to handle each client
+//     private static class ClientHandler implements Runnable {
+//         private final Socket socket;
 
-//     public void updateDish(Dish dish) throws SQLException {
-//         dishDAL.updateDish(dish);
-//     }
+//         ClientHandler(Socket socket) {
+//             this.socket = socket;
+//         }
 
-//     public void deleteDish(int dishId) throws SQLException {
-//         dishDAL.deleteDish(dishId);
-//     }
-
-//     public List<Dish> getAllDishesBySeller(int sellerId) throws SQLException {
-//         return dishDAL.getAllDishesBySeller(sellerId);
-//     }
-
-//     public Dish getDishById(int id) throws SQLException {
-//         return dishDAL.GetDishById(id);
-//     }
-
-//     public List<Dish> getAllDishes() throws SQLException {
-//         return dishDAL.getAllDishes();
+//         public void run() {
+//             try (
+//                 BufferedReader in = new BufferedReader(
+//                     new InputStreamReader(socket.getInputStream()));
+//                 PrintWriter out = new PrintWriter(
+//                     socket.getOutputStream(), true);
+//             ) {
+//                 String line;
+//                 // Echo back each received line
+//                 while ((line = in.readLine()) != null) {
+//                     System.out.println("Received: " + line);
+//                     out.println("Echo: " + line);
+//                 }
+//             } catch (IOException e) {
+//                 System.err.println("Connection error: " + e.getMessage());
+//             } finally {
+//                 try {
+//                     socket.close();
+//                     System.out.println("Client disconnected.");
+//                 } catch (IOException ignored) {}
+//             }
+//         }
 //     }
 // }

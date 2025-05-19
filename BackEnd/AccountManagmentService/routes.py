@@ -9,10 +9,15 @@ from typing import Optional
 from database import db
 from Models import Account
 routes = Blueprint("routes", __name__)
+from Admin import array_logs 
 
 LOG_EXCHANGE = "log_exchange"
 LOG_ROUTING_KEY_INFO = "AccountService_Info"
 LOG_ROUTING_KEY_ERROR = "AccountService_Error"
+
+@routes.route('/print_logs', methods=["GET"])
+def print_logs():
+   return jsonify({"message": f"Registered {array_logs}"}), 200
 
 @routes.route('/register', methods=["POST"])
 def register():
@@ -44,8 +49,6 @@ def register():
         log_event(log_channel, "Info", f"New user registered: {user.username}")
     return jsonify({"message": f"Registered {user.username}"}), 201
 
-
-
 @routes.route('/login', methods=["POST"])
 def login():
     log_channel = setup_logging()
@@ -71,7 +74,6 @@ def login():
         log_event(log_channel, "Info", f"User {user.username} logged in successfully")
     return jsonify({"message": "Login successful"}), 200
 
-
 @routes.route('/logout', methods=['POST'])
 def logout():
     session.clear()
@@ -81,9 +83,11 @@ def logout():
 def get_account_info():
     id = request.args.get("id")
     if not id:
+        log_event(setup_logging(), "Error", "User not authenticated")
         return jsonify({"error": "User not found"}), 401
     user = Account.query.filter_by(id=id).first()
     if not user:
+        log_event(setup_logging(), "Error", "User not authenticated")
         return jsonify({"error": "User not found"}), 404
     return jsonify({
         "username": user.username,
@@ -93,24 +97,27 @@ def get_account_info():
 def get_company_info():
     id = request.args.get("id")
     if not id:
+        log_event(setup_logging(), "Error", "User not authenticated")
         return jsonify({"error": "User not found"}), 401
     user = Account.query.filter_by(id=id).first()
     if not user:
+        log_event(setup_logging(), "Error", "User not authenticated")
         return jsonify({"error": "User not found"}), 404
     return jsonify({
         "username": user.username,
         "location": user.location,
     }), 200
  
-
 @routes.route('/me', methods=['GET'])
 def me():
     user_id = session.get("id")
     if not user_id:
+        # log_event(setup_logging(), "Error", "User not authenticated")
         return jsonify({"error": "Not authenticated"}), 401
 
     user = Account.query.get(user_id)
     if not user:
+        log_event(setup_logging(), "Error", "User not authenticated")
         session.clear()
         return jsonify({"error": "User no longer exists"}), 401
 
@@ -121,15 +128,12 @@ def me():
         "location":user.location,
         "balance":user.balance
     }), 200
-    
-    
-
 
 @routes.route('/list_all', methods=["GET"])
 def list_all_accounts():
+    log_event(setup_logging(), "Info", "Listing all accounts")
     accounts = Account.query.all()
     return jsonify([account.to_json() for account in accounts]), 200
-
 
 @routes.route('/list_all_customer', methods=["GET"])
 def list_all_customers():
@@ -142,8 +146,6 @@ def list_all_customers():
     accounts = Account.query.filter_by(role="Customer").all()
     return jsonify([account.to_json() for account in accounts]), 200
 
-
-
 @routes.route('/list_all_companies', methods=["GET"])
 def list_all_companies():
     id=session.get("id")
@@ -155,7 +157,6 @@ def list_all_companies():
     accounts = Account.query.filter_by(role="Company").all()
     return jsonify([account.to_json() for account in accounts]), 200
 
-
 @routes.route('/list_all_shipping_companies', methods=["GET"])
 def list_all_shipping_companies():
     id=session.get("id")
@@ -166,7 +167,6 @@ def list_all_shipping_companies():
         return jsonify({"error": "Not an admin"}), 403
     accounts = Account.query.filter_by(role="Shipping").all()
     return jsonify([account.to_json() for account in accounts]), 200
-
 
 @routes.route('/create_company',methods=["POST"])
 def create_company():
@@ -202,7 +202,6 @@ def create_company():
     return jsonify({"message": "Company created successfully",
     "username": Company.username,
     "password": Company.password}), 200
-    
     
 @routes.route('/getShippingFees',methods=["GET"])
 def getShippingFees():
@@ -251,24 +250,6 @@ RABBITMQ_PARAMS = pika.ConnectionParameters(
 EXCHANGE     = "order_exchange"
 ROUTING_KEY  = "customer"
 QUEUE_NAME   = "customer_request_queue"
-# PAYMENT_EXCHANGE = "payments_exchange"
-# PAYMENT_FAILED_ROUTING_KEY = "PaymentFailed"
-
-# def notify_admin_payment_failed(customer_id, cost):
-#     connection = pika.BlockingConnection(RABBITMQ_PARAMS)
-#     channel = connection.channel()
-#     channel.exchange_declare(exchange=PAYMENT_EXCHANGE, exchange_type="direct", durable=True)
-#     event = {
-#         "event": "PaymentFailed",
-#         "customerId": customer_id,
-#         "cost": cost
-#     }
-#     channel.basic_publish(
-#         exchange=PAYMENT_EXCHANGE,
-#         routing_key=PAYMENT_FAILED_ROUTING_KEY,
-#         body=json.dumps(event)
-#     )
-#     connection.close()
 
 def on_customer_request(ch, method, props, body, flask_app):
     log_channel = setup_logging()
@@ -309,7 +290,7 @@ def on_customer_request(ch, method, props, body, flask_app):
             print(f"[CustomerRPC] Error: {e}")
             db.session.rollback()
             if log_channel:
-                log_event(log_channel, "Error", f"RPC request failed: {str(e)}")
+                log_event(log_channel, "*_Error", f"RPC request failed: {str(e)}")
             response = "false"
     
     # Only try to reply if we have a valid reply_to queue
@@ -373,7 +354,7 @@ def log_event(channel, severity: str, message: str):
     severity: "Info" or "Error"
     """
     try:
-        routing_key = f"AccountService_{severity}"
+        routing_key = severity
         log_message = {
             "service": "AccountService",
             "severity": severity,

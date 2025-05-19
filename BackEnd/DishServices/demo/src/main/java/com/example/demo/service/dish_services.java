@@ -51,8 +51,14 @@ public class dish_services {
         channel.exchangeDeclare(LOG_EXCHANGE, BuiltinExchangeType.TOPIC, true);
     }
 
-    public void AddDish(Dish dish) {
+    public void AddDish(Dish dish) throws IOException {
+try{
         dishRepo.save(dish);
+    }
+        catch(Exception e) {
+    logEvent("Dish", "*_Error", "Dish is not Add");
+
+        }
     }
 
     public int getDishamount(String Name) {
@@ -75,6 +81,10 @@ public class dish_services {
 
     public void performquantatycheck() {
 
+    }
+
+    public List<Dish> getsales(){
+        return dishRepo.getsales();
     }
 
     public Dish getDishById(int id) {
@@ -145,7 +155,7 @@ public class dish_services {
     @RabbitListener(queues = "rpc.check_stock")
     @SendTo // ← without this, your "boolean" just vanishes
     @Transactional
-    public String checkStock(@Payload String body) {
+    public String checkStock(@Payload String body) throws IOException {
         ObjectMapper mapper = new ObjectMapper();
         boolean outOfStock = false;
 
@@ -164,6 +174,7 @@ public class dish_services {
             }
             System.out.println(" [x] Sent '" + outOfStock + "'");
         } catch (Exception ex) {
+            logEvent("Dish", "*_Error", "LOG_EXCHANGE: Error in checkStock");
             outOfStock = true;
         }
 
@@ -219,7 +230,7 @@ public class dish_services {
     // .orElse("FAIL:NoSuchDish");
 
 @Transactional
-public void UpdateDish(Dish incoming) throws AccessDeniedException {
+public void     UpdateDish(Dish incoming) throws IOException {
     // 1) Load (and lock) the existing dish
     Dish existing = dishRepo.findByIdForUpdate(incoming.getId())
         .orElseThrow(() -> new EntityNotFoundException(
@@ -228,6 +239,7 @@ public void UpdateDish(Dish incoming) throws AccessDeniedException {
 
     // 2) Security check: verify the dish belongs to the company attempting to update it
     if (!existing.getCompany_id().equals(incoming.getCompany_id())) {
+        logEvent("Dish", "*_Error", "LOG_EXCHANGE: You can only update dishes that belong to your company");
         throw new AccessDeniedException("You can only update dishes that belong to your company");
     }
 

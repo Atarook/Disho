@@ -25,5 +25,7 @@ public interface dish_Repo extends JpaRepository<Dish, Integer> , JpaSpecificati
     public Optional<Dish> findByIdForUpdate(int id);
    @Query("SELECT d FROM Dish d WHERE d.company_id = :companyId")
   List<Dish> findAllByCompany(@Param("companyId") Long companyId);
+  @Query("SELECT d FROM Dish d WHERE d.sale = true")
+  List<Dish> getsales();
 
 }

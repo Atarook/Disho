@@ -15,11 +15,10 @@ public class OrderItem {
 
     public String dishName;
     public Double dishPrice;
-
     public int dishId;
-    
     public long orderId;
     public Long company_id;
+
 
     @ManyToOne
     @JsonIgnore
@@ -28,6 +27,13 @@ public class OrderItem {
 
 
 
+    public Long getCompany_id() {
+        return company_id;
+    }
+
+    public void setCompany_id(Long company_id) {
+        this.company_id = company_id;
+    }
 
     public long getOrderId() {
         return orderId;
