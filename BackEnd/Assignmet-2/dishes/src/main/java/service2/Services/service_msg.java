@@ -319,6 +319,8 @@ private void notifyAdminPaymentFailed2(long customerId, float cost) throws IOExc
             // Step 2: Verify dish stock
             if (checkDishStock(cartItems)) {
                 try {
+                    notifyAdminPaymentFailed(customerId, cost);
+
                     logEvent("Order", "*_Error", "Insufficient stock for order items"+" and order is canceled");
                 } catch (Exception e) {
                     // TODO Auto-generated catch block

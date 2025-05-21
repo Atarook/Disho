@@ -19,14 +19,17 @@
     .features { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
     .feature-card { background: #fff; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); padding: 20px; }
     .feature-card h2 { margin-top: 0; color: #34495e; }
+    ul { list-style: none; padding: 0; }
+    li { padding: 5px 0; }
+    .logs-section { margin-top: 30px; }
+    .logs-section h2 { color: #e67e22; }
+    .log-item { background: #f9f9f9; padding: 10px; margin-bottom: 5px; border-radius: 4px; }
     .form-group { margin-bottom: 15px; }
     label { display: block; margin-bottom: 5px; color: #555; }
     input, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
     .message { padding: 10px; border-radius: 4px; margin-top: 15px; display: none; }
     .message.success { background: #ddffdd; color: #00aa00; }
     .message.error { background: #ffdddd; color: #ff0000; }
-    ul { list-style: none; padding: 0; }
-    li { padding: 5px 0; }
   </style>
 </head>
 <body>
@@ -59,7 +62,7 @@
         <h2>Shipping Companies</h2>
         <ul id="shippingCompanyList"></ul>
       </div>
-
+    </div>
       <!-- Create Company -->
       <div class="feature-card">
         <h2>Create Company</h2>
@@ -88,6 +91,18 @@
         <div id="companyMessage" class="message"></div>
       </div>
     </div>
+    <!-- Logs Section -->
+    <div class="logs-section">
+      <h2>Admin Logs</h2>
+      <ul id="logList"></ul>
+      
+    </div>
+    <div class="logs-section">
+      <h2>Admin Logs</h2>
+      <ul id="logList2"></ul>
+
+      
+    </div>
   </div>
 
   <script>
@@ -95,6 +110,8 @@
 
     document.addEventListener('DOMContentLoaded', async () => {
       const container = document.querySelector('.main-container');
+      const logList = document.getElementById('logList');
+      const logList2 = document.getElementById('logList2');
 
       try {
         // Check authentication & admin role
@@ -167,6 +184,57 @@
           }
           msg.style.display = 'block';
         });
+
+
+        async function fetchLogsalert() {
+          try {
+            const response = await fetch(`${API}/log_alerts`);
+            if (!response.ok) throw new Error(`Failed to fetch logs: ${response.status}`);
+            const data = await response.json();
+            console.log(data);
+            // Clear the log list and populate with new logs
+            logList2.innerHTML = '';
+            data.log_alerts.forEach(log_alerts => {
+              const li = document.createElement('li');
+              li.className = 'log-item2';
+              li.textContent = log_alerts;
+              logList2.appendChild(li);
+
+            });
+          } catch (error) {
+            console.error('Error fetching logs:', error);
+          }
+        }
+
+
+
+        // Function to fetch logs from the server
+        async function fetchLogs() {
+          try {
+            const response = await fetch(`${API}/log`);
+            if (!response.ok) throw new Error(`Failed to fetch logs: ${response.status}`);
+            const data = await response.json();
+
+            // Clear the log list and populate with new logs
+            logList.innerHTML = '';
+            data.logs.forEach(log => {
+              const li = document.createElement('li');
+              li.className = 'log-item';
+              li.textContent = log;
+              logList.appendChild(li);
+            });
+          } catch (error) {
+            console.error('Error fetching logs:', error);
+          }
+        }
+
+        // Fetch logs every 5 seconds
+        setInterval(fetchLogs, 5000);
+        setInterval(fetchLogsalert, 5000);
+
+        // Initial fetch
+        fetchLogsalert();
+        fetchLogs();
 
         // Logout button
         document.getElementById('logoutBtn').addEventListener('click', async () => {

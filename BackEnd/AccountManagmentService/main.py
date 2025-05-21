@@ -1,4 +1,5 @@
 import os
+from flask_socketio import SocketIO
 import threading
 
 from flask import Flask
@@ -15,6 +16,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 SECRET_KEY   = os.environ.get("SECRET_KEY")
 
 app = Flask(__name__)
+# socketio = SocketIO(app, cors_allowed_origins="*")
 CORS(app,
      supports_credentials=True,
      resources={r"/*": {"origins": "http://localhost:8000"}})
@@ -45,13 +47,17 @@ with app.app_context():
     
 
 if __name__ == "__main__":
-    
+   
+
     # Pass the app to the RPC server
     rpc_thread = threading.Thread(target=routes.start_customer_rpc_server, args=(app,), daemon=True)
     rpc_thread.start()
     thread2=threading.Thread(target=Admin.wait, args=(app,), daemon=True)
     thread3=threading.Thread(target=logs.admin_error_log_consumer, args=(app,), daemon=True)
+  
     thread2.start()
     thread3.start()
     # Start Flask web server
     app.run(debug=True)
+    # socketio.run(app, debug=True)
+

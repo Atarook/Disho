@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SocketIO Admin Logs Test</title>
+  <script src="https://cdn.socket.io/4.7.1/socket.io.min.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; }
+    h1 { margin-bottom: 1rem; }
+    ul { list-style: none; padding: 0; }
+    li { 
+      background: #f0f0f0; 
+      margin: 0.5rem 0; 
+      padding: 0.5rem 1rem; 
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>SocketIO Admin Logs</h1>
+  <p>Connecting to <code>http://localhost:5000</code></p>
+  <ul id="errors">
+    <li><em>Waiting for logs…</em></li>
+  </ul>
+
+  <script>
+    // If your SocketIO server is elsewhere, adjust the URL below:
+    const socket = io('http://localhost:5000', {
+      transports: ['websocket'],  // you can tweak this
+    });
+    const list = document.getElementById('errors');
+
+    socket.on('connect', () => {
+      console.log('Connected to socket.io');
+    });
+
+    socket.on('admin_log', data => {
+      // drop placeholder
+      if (list.children.length === 1 && list.firstChild.textContent.includes('Waiting')) {
+        list.innerHTML = '';
+      }
+      const li = document.createElement('li');
+      li.textContent = new Date().toLocaleTimeString() + ' – ' + data.message;
+      list.prepend(li);
+    });
+
+    socket.on('disconnect', () => {
+      const li = document.createElement('li');
+      li.textContent = 'Disconnected from server';
+      list.prepend(li);
+    });
+  </script>
+</body>
+</html>

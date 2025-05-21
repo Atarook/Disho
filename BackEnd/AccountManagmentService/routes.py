@@ -1,3 +1,4 @@
+from asyncio import Queue
 import json
 import pika
 from flask import Blueprint, request, jsonify, session
@@ -9,7 +10,7 @@ from typing import Optional
 from database import db
 from Models import Account
 routes = Blueprint("routes", __name__)
-from Admin import array_logs 
+from shared import array_logs  # Import from shared.py
 
 LOG_EXCHANGE = "log_exchange"
 LOG_ROUTING_KEY_INFO = "AccountService_Info"
@@ -390,3 +391,28 @@ def setup_logging():
     except Exception as e:
         print(f"Failed to setup logging: {e}")
         return None
+
+
+
+@routes.route('/log', methods=["GET"])
+def log_message():
+    with array_logs_lock:  # Ensure thread-safe access
+        logs = list(array_logs)
+        if (len(logs) > 10):
+            logs = logs[-10:]
+        # array_logs.clear()  # Create a copy of the logs
+    if not logs:
+        logs = ["No logs available"]
+    return jsonify({"logs": logs}), 200
+
+from shared import log_alerts, array_logs_lock
+@routes.route('/log_alerts', methods=["GET"])
+def get_log_alerts():
+    with array_logs_lock:  # Ensure thread-safe access
+        alerts = list(log_alerts) 
+        if (len(alerts) > 10):
+            alerts = alerts[-10:]
+        # log_alerts.clear()  # Clear the alerts after copying
+    if not alerts:
+        alerts = ["No log alerts available"]
+    return jsonify({"log_alerts": alerts}), 200
